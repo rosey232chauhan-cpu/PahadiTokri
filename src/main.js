@@ -57,10 +57,12 @@ const state = {
 }
 const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 const root = document.querySelector('#root')
+const whatsappNumber = '917018777497'
 let razorpayScriptPromise
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]))
 const parsePrice = (price) => Number(price.replace(/[^0-9.]/g, '')) || 0
 const itemWithCartData = (item, categoryName, quantity = 1) => ({ ...item, id: `${categoryName}-${item.name}`, sku: `${categoryName}-${item.name}`.toLowerCase().replaceAll(' ', '-'), categoryName, quantity, priceNumber: parsePrice(item.price) })
+const allProducts = productCategories.flatMap((category) => category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name })))
 const saveState = () => {
   localStorage.setItem('pahaditokri_cart', JSON.stringify(state.cartItems))
   localStorage.setItem('pahaditokri_orders', JSON.stringify(state.orderHistory))
@@ -68,6 +70,12 @@ const saveState = () => {
 }
 const cartItemCount = () => state.cartItems.reduce((total, item) => total + item.quantity, 0)
 const link = (path, label, className = '') => `<a href="${path}" class="${className}" data-route>${label}</a>`
+const whatsappLink = (message) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+
+function productCard(item) {
+  const reference = `${item.categorySlug}|${item.name}`
+  return `<article class="catalog-product-card" data-product-card data-name="${escapeHtml(item.name.toLowerCase())}" data-category="${item.categorySlug}" data-price="${parsePrice(item.price)}"><div class="catalog-product-image"><img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy"><span class="availability-badge">Check availability</span></div><div class="catalog-product-content"><p class="catalog-product-category">${escapeHtml(item.categoryName)}</p><h3>${escapeHtml(item.name)}</h3><p class="catalog-product-description">${escapeHtml(item.info)}</p><p class="catalog-product-price">${escapeHtml(item.price)}</p><label class="quantity-picker">Quantity<select aria-label="Quantity of ${escapeHtml(item.name)} in kilograms" data-product-quantity><option value="1">1 kg</option><option value="2">2 kg</option><option value="5">5 kg</option></select></label><button class="btn primary catalog-add-button" type="button" data-add="${escapeHtml(reference)}">Add to Cart</button></div></article>`
+}
 
 function loadRazorpayCheckout() {
   if (window.Razorpay) return Promise.resolve()
@@ -114,12 +122,36 @@ function header() {
 }
 
 function homePage() {
-  const featured = [
-    ['Farm Fresh Fruit Box', 'A weekly mix of seasonal fruits sourced from trusted farms.', productCategories[0].items[0].image],
-    ['Breakfast Energy Pack', 'Bananas, apples, oranges, and berries for a healthy start.', productCategories[0].items[1].image],
-    ['Immunity Booster Basket', 'Vitamin-rich citrus, pomegranate, and kiwi in one bundle.', productCategories[0].items[3].image],
+  const categoryCards = [
+    { title: 'Fruits', image: productCategories[0].image, path: '/products/fresh-fruits', note: 'Fresh seasonal picks' },
+    { title: 'Grains', image: productCategories[2].image, path: '/products/grains', note: 'Wholesome pantry staples' },
+    { title: 'Dry fruits', image: productCategories[1].image, path: '/products/dried-fruits', note: 'Naturally satisfying snacks' },
+    { title: 'Pulses', image: productCategories[2].items[0].image, path: '', note: 'Ask us about seasonal availability' },
   ]
-  return `<div class="home-layout"><section class="hero-section"><div><img class="home-brand-logo" src="${pahadiTokriLogo}" alt="PahadiTokri brand logo"><p class="eyebrow">Fresh Every Morning</p><h1>Organic Fruit Delivery for the Modern Home</h1><p class="hero-copy">PahadiTokri delivers freshly harvested fruits to your doorstep with a clean, reliable, and quality-first experience.</p><div class="hero-actions">${link('/products', 'Explore Products', 'btn primary')}${link('/contact-us', 'Contact Sales', 'btn secondary')}</div></div><div class="hero-visual"><img src="${productCategories[0].image}" alt="Fresh seasonal fruit harvest" fetchpriority="high"></div></section><section class="section-block"><h2>Why Families Choose PahadiTokri</h2><div class="highlight-row">${['100% handpicked produce', 'Direct from local growers', 'Fast same-day dispatch'].map((item) => `<article class="info-chip"><p>${item}</p></article>`).join('')}</div></section><section class="section-block"><h2>Featured Fruit Collections</h2><div class="product-grid">${featured.map(([name, description, image]) => `<article class="product-card"><img src="${image}" alt="${name}" loading="lazy"><div class="product-card-content"><h3>${name}</h3><p>${description}</p></div></article>`).join('')}</div></section><section class="section-block"><h2>PahadiTokri In Motion</h2><div class="video-showcase-grid">${showcaseVideos.map((video) => `<article class="video-card"><video autoplay muted loop playsinline preload="metadata"><source src="${video.url}" type="video/mp4"></video><div class="video-card-content"><h3>${video.title}</h3><p>${video.description}</p><button type="button" class="video-control-btn" data-video-toggle>Pause Video</button></div></article>`).join('')}</div></section></div>`
+  const bestPicks = [allProducts[0], allProducts[4], allProducts[8], allProducts[12]]
+  const himachalProduce = [
+    { title: 'Shimla apples', image: productCategories[0].items[0].image, note: 'Ask us to confirm that this batch is from Shimla and currently available.' },
+    { title: 'Himachali rajma', image: productCategories[2].items[0].image, note: 'Ask us to confirm the source and seasonal availability.' },
+    { title: 'Local walnuts', image: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=800&q=80', note: 'Ask us about sourcing and seasonal availability.' },
+    { title: 'Traditional grains & pulses', image: productCategories[2].image, note: 'Contact us to check what is available this season.' },
+    { title: 'Seasonal local produce', image: farmMedia[0].image, note: 'Ask us what is in season and where each batch comes from.' },
+  ]
+  const himachalCards = himachalProduce.map((item) => `<article class="hill-produce-card"><img src="${item.image}" alt="${escapeHtml(item.title)}" loading="lazy"><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.note)}</p><a href="${whatsappLink(`Hello PahadiTokri, please share current availability and sourcing details for ${item.title}.`)}" target="_blank" rel="noopener noreferrer">Ask on WhatsApp</a></div></article>`).join('')
+  const comboCards = [
+    { title: 'Build a fruit basket', description: 'Choose your favourite seasonal fruit and quantities from the catalogue.', image: productCategories[0].image, path: '/products/fresh-fruits', action: 'Choose fruits' },
+    { title: 'Stock up on grains', description: 'Browse grain staples and choose the quantities that suit your home.', image: productCategories[2].image, path: '/products/grains', action: 'Shop grains' },
+  ]
+  return `<div class="home-layout">
+    <section class="hero-section"><div class="hero-copy-block"><p class="eyebrow">From the hills to your home</p><h1>Freshness from the Hills, Delivered to Your Home.</h1><p class="hero-copy">Discover seasonal fruits, wholesome grains and everyday goodness from PahadiTokri.</p><p class="hero-assurance">Locally sourced <span aria-hidden="true">•</span> Fresh quality <span aria-hidden="true">•</span> Convenient delivery</p><div class="hero-actions">${link('/products/fresh-fruits', 'Shop Fruits', 'btn primary')}${link('/products/grains', 'Shop Grains', 'btn secondary')}</div><p class="hero-origin">Based in Karal, Kotkhai, Shimla, Himachal Pradesh</p></div><div class="hero-visual"><img class="hero-fruit-image" src="${productCategories[0].items[0].image}" alt="Fresh red apples" fetchpriority="high"><img class="hero-grain-image" src="${productCategories[2].image}" alt="Golden grain harvest" loading="lazy"><span class="hero-photo-note">A little goodness from the hills</span></div></section>
+    <section class="section-block category-section"><div class="section-heading"><div><p class="eyebrow">Find your favourites</p><h2>Shop by Category</h2></div>${link('/products', 'View all products', 'text-link')}</div><div class="home-category-grid">${categoryCards.map((category) => category.path ? `<a class="home-category-card" href="${category.path}" data-route><img src="${category.image}" alt="${category.title}" loading="lazy"><span><strong>${category.title}</strong><small>${category.note}</small></span></a>` : `<a class="home-category-card category-coming-soon" href="${whatsappLink('Hello PahadiTokri, please share your current pulses availability.')}" target="_blank" rel="noopener noreferrer"><img src="${category.image}" alt="${category.title}" loading="lazy"><span><strong>${category.title}</strong><small>${category.note}</small></span></a>`).join('')}</div></section>
+    <section class="section-block catalogue-feature"><div class="section-heading"><div><p class="eyebrow">Picked from our current range</p><h2>Best Sellers</h2><p class="section-caption">Featured catalogue picks; not yet ranked by sales.</p></div>${link('/products', 'Shop all products', 'text-link')}</div><div class="home-product-grid">${bestPicks.map(productCard).join('')}</div></section>
+    <section class="section-block himachal-section"><div class="himachal-intro"><p class="eyebrow">Our home in the hills</p><h2>From the Hills of Himachal</h2><p>Our business is based in Karal, Kotkhai, Shimla. Product origins and seasonal availability can vary by batch—ask us and we’ll confirm before you order.</p></div><div class="hill-produce-grid">${himachalCards}</div></section>
+    <section class="section-block combo-section"><div class="section-heading"><div><p class="eyebrow">Make it your own</p><h2>Combos &amp; Everyday Picks</h2><p class="section-caption">Choose products and quantities from the live catalogue. No bundle discount is applied.</p></div></div><div class="combo-grid">${comboCards.map((combo) => `<article class="combo-card"><img src="${combo.image}" alt="${combo.title}" loading="lazy"><div><h3>${combo.title}</h3><p>${combo.description}</p>${link(combo.path, combo.action, 'btn secondary')}</div></article>`).join('')}</div></section>
+    <section class="section-block why-section"><p class="eyebrow">The PahadiTokri promise</p><h2>Why PahadiTokri?</h2><div class="why-grid"><article><span aria-hidden="true">01</span><h3>Fresh quality</h3><p>Thoughtfully selected products from the current catalogue.</p></article><article><span aria-hidden="true">02</span><h3>Local roots</h3><p>We’re based in Kotkhai, Shimla, Himachal Pradesh.</p></article><article><span aria-hidden="true">03</span><h3>Simple ordering</h3><p>Choose your quantity, review the delivery charge, and order online.</p></article></div></section>
+    <section class="section-block reviews-section"><p class="eyebrow">Your experience matters</p><h2>Customer Reviews</h2><p>Verified customer feedback will appear here as we collect it. We don’t publish unverified testimonials.</p></section>
+    <section class="section-block delivery-section"><div><p class="eyebrow">Before you order</p><h2>Delivery Information</h2><p>Delivery charge: ₹49 per order. Delivery areas and estimated timing are confirmed for your address—message us on WhatsApp before ordering if you’d like to check.</p></div><a class="btn primary" href="${whatsappLink('Hello PahadiTokri, please confirm delivery availability and estimated timing for my area.')}" target="_blank" rel="noopener noreferrer">Check delivery on WhatsApp</a></section>
+    <section class="section-block"><h2>PahadiTokri In Motion</h2><div class="video-showcase-grid">${showcaseVideos.map((video) => `<article class="video-card"><video autoplay muted loop playsinline preload="metadata"><source src="${video.url}" type="video/mp4"></video><div class="video-card-content"><h3>${video.title}</h3><p>${video.description}</p><button type="button" class="video-control-btn" data-video-toggle>Pause Video</button></div></article>`).join('')}</div></section>
+  </div>`
 }
 
 function farmStoriesPage() {
@@ -142,23 +174,24 @@ function aboutPage() {
 }
 
 function productsPage() {
-  return `<div class="products-layout"><section class="page-card section-block products-hero"><p class="eyebrow">Curated Categories</p><h1>Our Products</h1><p>Explore premium Himalayan produce categories crafted for taste, nutrition, and everyday healthy living.</p></section><section class="product-category-grid">${productCategories.map((category) => `<a class="product-category-link" href="/products/${category.slug}" data-route><article class="product-category-card"><img src="${category.image}" alt="${category.name}" loading="lazy"><div class="product-category-content"><h3>${category.name}</h3><p>${category.description}</p></div></article></a>`).join('')}</section></div>`
+  return `<div class="products-layout"><section class="page-card section-block products-hero"><p class="eyebrow">From our current catalogue</p><h1>Shop Products</h1><p>Search the catalogue, filter by category or price, and choose your quantity in kilograms. Stock is not tracked live, so please confirm availability with us before ordering.</p></section><section class="catalogue-controls" aria-label="Search and filter products"><label>Search products<input type="search" id="product-search" placeholder="Try apples or grains" autocomplete="off"></label><label>Category<select id="product-category-filter"><option value="">All categories</option>${productCategories.map((category) => `<option value="${category.slug}">${category.name}</option>`).join('')}</select></label><label>Minimum price<input type="number" id="product-min-price" min="0" inputmode="numeric" placeholder="₹0"></label><label>Maximum price<input type="number" id="product-max-price" min="0" inputmode="numeric" placeholder="No limit"></label></section><p class="catalog-results" id="catalog-results" aria-live="polite">${allProducts.length} products</p><section class="catalog-product-grid" id="catalog-product-grid">${allProducts.map(productCard).join('')}</section><p class="catalog-empty" id="catalog-empty" hidden>No products match those filters. Try changing your search.</p></div>`
 }
 
 function categoryPage(slug) {
   const category = productCategories.find((entry) => entry.slug === slug)
   if (!category) return `<section class="page-card section-block"><h1>Category Not Found</h1><p>Please go back to our products page and choose a valid category.</p>${link('/products', 'Back to Products', 'btn primary')}</section>`
-  return `<div class="products-layout"><section class="page-card section-block products-hero"><p class="eyebrow">Category Details</p><h1>${category.name}</h1><p>${category.description}</p></section><section class="category-item-grid">${category.items.map((item) => `<article class="category-item-card"><img src="${item.image}" alt="${item.name}" loading="lazy"><h3>${item.name}</h3><p class="item-price">${item.price}</p><p>${item.info}</p><div class="item-actions"><button type="button" class="btn secondary action-btn" data-add="${category.slug}|${item.name}">Add to Cart</button><button type="button" class="btn primary action-btn" data-buy="${category.slug}|${item.name}">Buy Now</button></div></article>`).join('')}</section></div>`
+  const items = category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name }))
+  return `<div class="products-layout"><section class="page-card section-block products-hero"><p class="eyebrow">Category Details</p><h1>${category.name}</h1><p>${category.description}</p>${link('/products', 'Browse all products', 'text-link')}</section><section class="catalog-product-grid">${items.map(productCard).join('')}</section></div>`
 }
 
 function cartPage() {
   const subtotal = state.cartItems.reduce((total, item) => total + item.priceNumber * item.quantity, 0)
   const shipping = subtotal > 0 ? 49 : 0
-  const gst = subtotal * 0.05
-  const total = subtotal + shipping + gst
-  const items = state.cartItems.length ? `<div class="cart-item-list">${state.cartItems.map((item) => `<article class="cart-item-card"><img src="${item.image}" alt="${item.name}" loading="lazy"><div class="cart-item-content"><h3>${item.name}</h3><p>${item.categoryName}</p><p class="item-price">${item.price}</p><div class="qty-controls"><button type="button" data-decrease="${item.id}">-</button><span>${item.quantity}</span><button type="button" data-increase="${item.id}">+</button></div></div><button type="button" class="remove-btn" data-remove="${item.id}">Remove</button></article>`).join('')}</div><div class="bill-breakdown"><p><span>Subtotal</span><span>₹${subtotal.toFixed(2)}</span></p><p><span>Shipping</span><span>₹${shipping.toFixed(2)}</span></p><p><span>GST (5%)</span><span>₹${gst.toFixed(2)}</span></p><p class="cart-total"><span>Total</span><span>₹${total.toFixed(2)}</span></p></div>` : '<p>Your cart is empty. Add products to place an order.</p>'
+  const gst = Math.round(subtotal * 0.05 * 100) / 100
+  const total = Math.round((subtotal + shipping + gst) * 100) / 100
+  const items = state.cartItems.length ? `<div class="cart-item-list">${state.cartItems.map((item) => `<article class="cart-item-card"><img src="${item.image}" alt="${item.name}" loading="lazy"><div class="cart-item-content"><h3>${item.name}</h3><p>${item.categoryName}</p><p class="item-price">${item.price}</p><div class="qty-controls"><button type="button" aria-label="Remove one kilogram of ${escapeHtml(item.name)}" data-decrease="${item.id}">−</button><span>${item.quantity} kg</span><button type="button" aria-label="Add one kilogram of ${escapeHtml(item.name)}" data-increase="${item.id}">+</button></div></div><button type="button" class="remove-btn" data-remove="${item.id}">Remove</button></article>`).join('')}</div><div class="bill-breakdown"><p><span>Subtotal</span><span>₹${subtotal.toFixed(2)}</span></p><p><span>Delivery charge</span><span>₹${shipping.toFixed(2)}</span></p><p><span>GST (5%)</span><span>₹${gst.toFixed(2)}</span></p><p class="cart-total"><span>Total</span><span>₹${total.toFixed(2)}</span></p><p class="delivery-estimate">Delivery timing and service area are confirmed for your address.</p></div>` : '<p>Your cart is empty. Add products to place an order.</p>'
   const history = state.orderHistory.length ? `<div class="order-history-list">${state.orderHistory.map((order) => `<article class="order-history-card"><h3>${order.orderId}</h3><p>${order.createdAt}</p><p>Customer: ${escapeHtml(order.customerName)}</p><p>Items: ${order.itemCount}</p><p>Payment: ${order.paymentMethod.toUpperCase()}</p><p class="item-price">Total: ₹${order.total}</p></article>`).join('')}</div>` : '<p>No previous orders yet.</p>'
-  return `<div class="products-layout"><section class="page-card section-block"><h1>Your Cart</h1>${items}</section><section class="page-card section-block"><h2>Place Order</h2><form class="contact-form" id="order-form"><label for="order-name">Full Name</label><input id="order-name" name="name" autocomplete="name" required><label for="order-phone">Phone Number</label><input id="order-phone" name="phone" type="tel" autocomplete="tel" required><label for="order-address">Delivery Address</label><textarea id="order-address" name="address" rows="4" autocomplete="street-address" required></textarea><fieldset class="payment-options"><legend>Payment Method</legend><label><input type="radio" name="paymentMethod" value="cod" checked>Cash on Delivery</label><label><input type="radio" name="paymentMethod" value="online">Online payment (Google Pay, UPI, cards)</label></fieldset><button type="submit" ${state.cartItems.length ? '' : 'disabled'}>Place Order</button></form><p class="form-success" id="order-success" hidden></p></section><section class="page-card section-block"><h2>Order History</h2>${history}</section></div>`
+  return `<div class="products-layout"><section class="page-card section-block"><h1>Your Cart</h1>${items}</section><section class="page-card section-block"><h2>Place Order</h2><p class="checkout-delivery-note">Delivery: ₹49 per order, plus 5% GST. We’ll confirm service area and delivery timing for your address.</p><form class="contact-form" id="order-form"><label for="order-name">Full Name</label><input id="order-name" name="name" autocomplete="name" required><label for="order-phone">Phone Number</label><input id="order-phone" name="phone" type="tel" autocomplete="tel" required><label for="order-address">Delivery Address</label><textarea id="order-address" name="address" rows="4" autocomplete="street-address" required></textarea><fieldset class="payment-options"><legend>Payment Method</legend><label><input type="radio" name="paymentMethod" value="cod" checked>Cash on Delivery</label><label><input type="radio" name="paymentMethod" value="online">Online payment (UPI, cards; subject to availability)</label></fieldset><button type="submit" ${state.cartItems.length ? '' : 'disabled'}>Place Order</button></form><p class="form-success" id="order-success" hidden></p></section><section class="page-card section-block"><h2>Order History</h2>${history}</section></div>`
 }
 
 function contactPage() {
@@ -185,7 +218,9 @@ function pageContent(path) {
 
 function render() {
   const path = window.location.pathname
-  root.innerHTML = `<div class="site-shell">${header()}<main class="site-main">${pageContent(path)}</main><footer class="site-footer"><p>© ${new Date().getFullYear()} PahadiTokri. Freshness Delivered Daily.</p></footer></div><div id="toast-container" aria-live="polite"></div>`
+  root.innerHTML = `<div class="site-shell">${header()}<main class="site-main">${pageContent(path)}</main><footer class="site-footer"><p>© ${new Date().getFullYear()} PahadiTokri. Freshness Delivered Daily.</p></footer></div><a class="floating-whatsapp" href="${whatsappLink('Hello PahadiTokri, I have a question about an order.')}" target="_blank" rel="noopener noreferrer" aria-label="Contact PahadiTokri on WhatsApp">WhatsApp</a><div id="toast-container" aria-live="polite"></div>`
+  const search = document.querySelector('#product-search')
+  if (search) applyCatalogFilters()
   document.querySelectorAll('.video-card, .farm-media-card').forEach((card) => {
     const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { card.classList.add('in-view'); observer.disconnect() } }, { threshold: 0.25 })
     observer.observe(card)
@@ -198,14 +233,15 @@ function findItem(reference) {
   return category ? { item: category.items.find((entry) => entry.name === itemName), category } : null
 }
 
-function addToCart(reference, replace = false) {
+function addToCart(reference, replace = false, quantity = 1) {
   const found = findItem(reference)
   if (!found?.item) return
-  const newItem = itemWithCartData(found.item, found.category.name)
+  const selectedQuantity = Math.max(1, Math.min(99, Number(quantity) || 1))
+  const newItem = itemWithCartData(found.item, found.category.name, selectedQuantity)
   if (replace) state.cartItems = [newItem]
   else {
     const existing = state.cartItems.find((item) => item.id === newItem.id)
-    state.cartItems = existing ? state.cartItems.map((item) => item.id === newItem.id ? { ...item, quantity: item.quantity + 1 } : item) : [...state.cartItems, newItem]
+    state.cartItems = existing ? state.cartItems.map((item) => item.id === newItem.id ? { ...item, quantity: Math.min(99, item.quantity + selectedQuantity) } : item) : [...state.cartItems, newItem]
   }
   saveState()
   render()
@@ -239,7 +275,12 @@ document.addEventListener('click', (event) => {
     return
   }
   const add = event.target.closest('[data-add]')
-  if (add) { addToCart(add.dataset.add); markClicked(add, 'Added to cart'); return }
+  if (add) {
+    const quantity = add.closest('[data-product-card]')?.querySelector('[data-product-quantity]')?.value || 1
+    addToCart(add.dataset.add, false, quantity)
+    markClicked(add, 'Added to cart')
+    return
+  }
   const buy = event.target.closest('[data-buy]')
   if (buy) { addToCart(buy.dataset.buy, true); markClicked(buy, 'Opening checkout'); return }
   const increase = event.target.closest('[data-increase]')
@@ -250,6 +291,36 @@ document.addEventListener('click', (event) => {
   if (remove) { state.cartItems = state.cartItems.filter((item) => item.id !== remove.dataset.remove); saveState(); render(); showToast('Item removed'); return }
   const toggle = event.target.closest('[data-video-toggle]')
   if (toggle) { const video = toggle.closest('.video-card').querySelector('video'); if (video.paused) { video.play(); toggle.textContent = 'Pause Video'; markClicked(toggle, 'Video playing') } else { video.pause(); toggle.textContent = 'Play Video'; markClicked(toggle, 'Video paused') } }
+})
+
+function applyCatalogFilters() {
+  const searchTerm = document.querySelector('#product-search')?.value.trim().toLowerCase() || ''
+  const category = document.querySelector('#product-category-filter')?.value || ''
+  const minimum = Number(document.querySelector('#product-min-price')?.value) || 0
+  const maximumInput = document.querySelector('#product-max-price')?.value
+  const maximum = maximumInput === '' || maximumInput == null ? Infinity : Number(maximumInput)
+  const cards = [...document.querySelectorAll('[data-product-card]')]
+  let visibleCount = 0
+  cards.forEach((card) => {
+    const visible = card.dataset.name.includes(searchTerm)
+      && (!category || card.dataset.category === category)
+      && Number(card.dataset.price) >= minimum
+      && Number(card.dataset.price) <= maximum
+    card.hidden = !visible
+    if (visible) visibleCount += 1
+  })
+  const results = document.querySelector('#catalog-results')
+  if (results) results.textContent = `${visibleCount} ${visibleCount === 1 ? 'product' : 'products'}`
+  const empty = document.querySelector('#catalog-empty')
+  if (empty) empty.hidden = visibleCount > 0
+}
+
+document.addEventListener('input', (event) => {
+  if (event.target.matches('#product-search, #product-min-price, #product-max-price')) applyCatalogFilters()
+})
+
+document.addEventListener('change', (event) => {
+  if (event.target.matches('#product-category-filter')) applyCatalogFilters()
 })
 
 document.addEventListener('submit', async (event) => {
@@ -368,7 +439,19 @@ function completeOrder(order, paymentMethod) {
   render()
   const success = document.querySelector('#order-success')
   if (success) {
-    success.textContent = `Your order has been placed successfully. Order ID: ${order.orderId}. Thank you for shopping with PahadiTokri.`
+    success.textContent = `Your order has been placed successfully. Order ID: ${order.orderId}. Thank you for shopping with PahadiTokri. To send your order details, `
+    const message = [
+      `Hello PahadiTokri, I placed order ${order.orderId}.`,
+      `Items: ${order.items.map((item) => `${item.name} x ${item.quantity} kg`).join(', ')}`,
+      `Total: ₹${Number(order.total).toFixed(2)}`,
+      `Payment: ${paymentMethod.toUpperCase()}`,
+    ].join('\n')
+    const confirmationLink = document.createElement('a')
+    confirmationLink.href = whatsappLink(message)
+    confirmationLink.target = '_blank'
+    confirmationLink.rel = 'noopener noreferrer'
+    confirmationLink.textContent = 'confirm on WhatsApp'
+    success.append(confirmationLink)
     success.hidden = false
   }
   showToast(paymentMethod === 'cod' ? 'Order placed successfully' : 'Payment successful')

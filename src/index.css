@@ -1,3 +1,23 @@
+:root {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: #293a2d;
+  background: #f5f3e9;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --forest: #244b36;
+  --forest-deep: #193b2b;
+  --leaf: #64804c;
+  --moss: #8c9a63;
+  --cream: #f5f3e9;
+  --paper: #fffdf6;
+  --earth: #dcd7c4;
+  --clay: #b66f4d;
+  --ink: #293a2d;
+  --muted: #647064;
+}
+
 *,
 *::before,
 *::after {
@@ -7,19 +27,31 @@
 html {
   min-width: 320px;
   overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background-color: #fff;
-  color: #222;
+  font-family: inherit;
+  background-color: var(--cream);
+  color: var(--ink);
   min-width: 320px;
   overflow-x: hidden;
+  line-height: 1.55;
 }
 
 button,
 input,
 textarea {
   max-width: 100%;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #d4dfbd;
+  color: var(--forest-deep);
 }
