@@ -1681,9 +1681,7 @@ a.is-clicked {
 }
 
 .site-shell {
-  background:
-    radial-gradient(ellipse at 10% 12%, rgba(196, 203, 160, 0.16), transparent 34rem),
-    var(--cream);
+  background: transparent;
 }
 
 .site-header {
