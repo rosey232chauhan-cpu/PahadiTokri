@@ -38,8 +38,16 @@ const productCategories = [
 ].map((category) => ({ ...category, items: category.items.map(([name, price, info, image]) => ({ name, price, info, image })) }))
 
 const showcaseVideos = [
-  { title: 'Fresh Harvest Journey', description: 'A glimpse of fresh produce moving from farms to your table.', url: 'https://videos.pexels.com/video-files/5948573/5948573-hd_1920_1080_25fps.mp4' },
-  { title: 'Healthy Food Lifestyle', description: 'Natural ingredients and healthy daily choices in motion.', url: 'https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4' },
+  { title: 'Grapes Picked by Hand', description: 'Watch ripe grapes gathered by hand among the vines.', url: 'https://videos.pexels.com/video-files/9947678/9947678-hd_1920_1080_25fps.mp4' },
+  { title: 'Rice Harvest Unloaded to Truck', description: 'See harvested rice transferred into a truck for the journey to market.', url: 'https://videos.pexels.com/video-files/6685751/6685751-hd_1920_1080_25fps.mp4' },
+]
+const farmMedia = [
+  { type: 'photo', label: 'Growing season', title: 'Fields through the growing season', description: 'A look across the green fields where each harvest begins.', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85', alt: 'Green agricultural fields across a mountain valley' },
+  { type: 'photo', label: 'Fruit harvest', title: 'Seasonal fruit, picked fresh', description: 'Explore the colors and textures of fresh seasonal produce.', image: productCategories[0].items[0].image, alt: 'Freshly harvested apples' },
+  { type: 'video', label: 'Fruit picking', title: showcaseVideos[0].title, description: showcaseVideos[0].description, video: showcaseVideos[0].url, poster: productCategories[0].items[1].image },
+  { type: 'photo', label: 'Grains', title: 'From grain fields to sorting', description: 'A closer look at wholesome grains before they are prepared for market.', image: productCategories[2].image, alt: 'Golden grain field ready for harvest' },
+  { type: 'photo', label: 'Sorting and packing', title: 'Careful selection before packing', description: 'Fresh produce selected and prepared for its journey to market.', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=85', alt: 'Fresh produce arranged for market' },
+  { type: 'video', label: 'Grains to market', title: showcaseVideos[1].title, description: showcaseVideos[1].description, video: showcaseVideos[1].url, poster: productCategories[2].image },
 ]
 
 const state = {
@@ -102,7 +110,7 @@ function markClicked(element, message) {
 
 function header() {
   const accountLinks = state.auth ? `<span class="account-name">Hi, ${escapeHtml(state.auth.user.name)}</span><button type="button" class="header-action" data-logout>Logout</button>` : `${link('/login', 'Login')} ${link('/register', 'Register')}`
-  return `<header class="site-header"><div class="brand"><img src="${pahadiTokriLogo}" alt="PahadiTokri logo"></div><nav>${link('/', 'Home')} ${link('/about', 'About')} ${link('/products', 'Products')} ${link('/cart', `Cart (${cartItemCount()})`)} ${link('/contact-us', 'Contact Us')} ${accountLinks}</nav></header>`
+  return `<header class="site-header"><div class="brand"><img src="${pahadiTokriLogo}" alt="PahadiTokri logo"></div><nav>${link('/', 'Home')} ${link('/about', 'About')} ${link('/farm', 'Farm Stories')} ${link('/products', 'Products')} ${link('/cart', `Cart (${cartItemCount()})`)} ${link('/contact-us', 'Contact Us')} ${accountLinks}</nav></header>`
 }
 
 function homePage() {
@@ -112,6 +120,16 @@ function homePage() {
     ['Immunity Booster Basket', 'Vitamin-rich citrus, pomegranate, and kiwi in one bundle.', productCategories[0].items[3].image],
   ]
   return `<div class="home-layout"><section class="hero-section"><div><img class="home-brand-logo" src="${pahadiTokriLogo}" alt="PahadiTokri brand logo"><p class="eyebrow">Fresh Every Morning</p><h1>Organic Fruit Delivery for the Modern Home</h1><p class="hero-copy">PahadiTokri delivers freshly harvested fruits to your doorstep with a clean, reliable, and quality-first experience.</p><div class="hero-actions">${link('/products', 'Explore Products', 'btn primary')}${link('/contact-us', 'Contact Sales', 'btn secondary')}</div></div><div class="hero-visual"><img src="${productCategories[0].image}" alt="Fresh seasonal fruit harvest" fetchpriority="high"></div></section><section class="section-block"><h2>Why Families Choose PahadiTokri</h2><div class="highlight-row">${['100% handpicked produce', 'Direct from local growers', 'Fast same-day dispatch'].map((item) => `<article class="info-chip"><p>${item}</p></article>`).join('')}</div></section><section class="section-block"><h2>Featured Fruit Collections</h2><div class="product-grid">${featured.map(([name, description, image]) => `<article class="product-card"><img src="${image}" alt="${name}" loading="lazy"><div class="product-card-content"><h3>${name}</h3><p>${description}</p></div></article>`).join('')}</div></section><section class="section-block"><h2>PahadiTokri In Motion</h2><div class="video-showcase-grid">${showcaseVideos.map((video) => `<article class="video-card"><video autoplay muted loop playsinline preload="metadata"><source src="${video.url}" type="video/mp4"></video><div class="video-card-content"><h3>${video.title}</h3><p>${video.description}</p><button type="button" class="video-control-btn" data-video-toggle>Pause Video</button></div></article>`).join('')}</div></section></div>`
+}
+
+function farmStoriesPage() {
+  const cards = farmMedia.map((item) => {
+    const visual = item.type === 'video'
+      ? `<video controls playsinline preload="none" poster="${item.poster}" aria-label="${item.title}"><source src="${item.video}" type="video/mp4"></video>`
+      : `<img src="${item.image}" alt="${item.alt}" loading="lazy">`
+    return `<article class="farm-media-card" data-media-type="${item.type}"><div class="farm-media-visual">${visual}<span class="farm-media-badge">${item.type === 'video' ? 'Video' : 'Photo'}</span></div><div class="farm-media-content"><p class="farm-media-label">${item.label}</p><h2>${item.title}</h2><p>${item.description}</p></div></article>`
+  }).join('')
+  return `<div class="farm-layout"><section class="farm-hero"><div><p class="eyebrow">Field notes</p><h1>Farm Stories</h1><p>Follow the journey from growing season to market through photos and videos of harvests, grains, and fresh produce.</p><div class="hero-actions">${link('/products', 'Shop the Harvest', 'btn primary')}</div></div><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85" alt="Green fields in a mountain valley" fetchpriority="high"></section><section class="farm-gallery" aria-label="Farm photos and videos"><div class="farm-gallery-heading"><div><p class="eyebrow">From the fields</p><h2>Harvest to market</h2></div><p id="farm-result-count" aria-live="polite">${farmMedia.length} stories</p></div><div class="farm-filter-list" role="group" aria-label="Filter farm stories"><button type="button" class="farm-filter-btn" data-farm-filter="all" aria-pressed="true">All</button><button type="button" class="farm-filter-btn" data-farm-filter="photo" aria-pressed="false">Photos</button><button type="button" class="farm-filter-btn" data-farm-filter="video" aria-pressed="false">Videos</button></div><div class="farm-media-grid">${cards}</div></section></div>`
 }
 
 function aboutPage() {
@@ -155,6 +173,7 @@ function authPage(mode) {
 function pageContent(path) {
   if (path === '/') return homePage()
   if (path === '/about') return aboutPage()
+  if (path === '/farm') return farmStoriesPage()
   if (path === '/products') return productsPage()
   if (path.startsWith('/products/')) return categoryPage(path.split('/')[2])
   if (path === '/cart') return cartPage()
@@ -167,7 +186,7 @@ function pageContent(path) {
 function render() {
   const path = window.location.pathname
   root.innerHTML = `<div class="site-shell">${header()}<main class="site-main">${pageContent(path)}</main><footer class="site-footer"><p>© ${new Date().getFullYear()} PahadiTokri. Freshness Delivered Daily.</p></footer></div><div id="toast-container" aria-live="polite"></div>`
-  document.querySelectorAll('.video-card').forEach((card) => {
+  document.querySelectorAll('.video-card, .farm-media-card').forEach((card) => {
     const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { card.classList.add('in-view'); observer.disconnect() } }, { threshold: 0.25 })
     observer.observe(card)
   })
@@ -209,6 +228,16 @@ document.addEventListener('click', (event) => {
   }
   const route = event.target.closest('[data-route]')
   if (route) { event.preventDefault(); const label = route.textContent.trim(); navigate(route.getAttribute('href')); showToast(`Opening ${label}`); return }
+  const farmFilter = event.target.closest('[data-farm-filter]')
+  if (farmFilter) {
+    const selectedFilter = farmFilter.dataset.farmFilter
+    document.querySelectorAll('[data-farm-filter]').forEach((button) => button.setAttribute('aria-pressed', String(button === farmFilter)))
+    const cards = [...document.querySelectorAll('.farm-media-card')]
+    cards.forEach((card) => { card.hidden = selectedFilter !== 'all' && card.dataset.mediaType !== selectedFilter })
+    const visibleCount = cards.filter((card) => !card.hidden).length
+    document.querySelector('#farm-result-count').textContent = `${visibleCount} ${visibleCount === 1 ? 'story' : 'stories'}`
+    return
+  }
   const add = event.target.closest('[data-add]')
   if (add) { addToCart(add.dataset.add); markClicked(add, 'Added to cart'); return }
   const buy = event.target.closest('[data-buy]')
