@@ -35,11 +35,22 @@ const productCategories = [
       ['Pumpkin Seeds', '₹460/kg', 'Protein-rich green seeds ideal for salads and trail mixes.', 'https://images.unsplash.com/photo-1547058881-aa0edd92aab3?auto=format&fit=crop&w=1200&q=80'],
     ],
   },
-].map((category) => ({ ...category, items: category.items.map(([name, price, info, image]) => ({ name, price, info, image })) }))
+].map((category) => ({
+  ...category,
+  items: category.items.map(([name, price, info, image]) => ({
+    name,
+    price,
+    info,
+    image,
+    sku: `${category.slug}-${name.toLowerCase().replaceAll(' ', '-')}`,
+  })),
+}))
 
 const showcaseVideos = [
-  { title: 'Grapes Picked by Hand', description: 'Watch ripe grapes gathered by hand among the vines.', url: 'https://videos.pexels.com/video-files/9947678/9947678-hd_1920_1080_25fps.mp4' },
-  { title: 'Rice Harvest Unloaded to Truck', description: 'See harvested rice transferred into a truck for the journey to market.', url: 'https://videos.pexels.com/video-files/6685751/6685751-hd_1920_1080_25fps.mp4' },
+  { title: 'Grapes Picked by Hand', description: 'Watch ripe grapes gathered by hand among the vines.', url: 'https://videos.pexels.com/video-files/9947678/9947678-hd_1920_1080_25fps.mp4', poster: productCategories[0].items[1].image },
+  { title: 'Rice Harvest Unloaded to Truck', description: 'See harvested rice transferred into a truck for the journey to market.', url: 'https://videos.pexels.com/video-files/6685751/6685751-hd_1920_1080_25fps.mp4', poster: productCategories[2].image },
+  { title: 'Harvest in Motion', description: 'A moving glimpse of farm life and the work behind every harvest.', url: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4', poster: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85' },
+  { title: 'From Farm to Market', description: 'Follow fresh produce on its journey from the fields to the table.', url: 'https://videos.pexels.com/video-files/853889/853889-hd_1920_1080_25fps.mp4', poster: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=85' },
 ]
 const farmMedia = [
   { type: 'photo', label: 'Growing season', title: 'Fields through the growing season', description: 'A look across the green fields where each harvest begins.', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85', alt: 'Green agricultural fields across a mountain valley' },
@@ -48,29 +59,66 @@ const farmMedia = [
   { type: 'photo', label: 'Grains', title: 'From grain fields to sorting', description: 'A closer look at wholesome grains before they are prepared for market.', image: productCategories[2].image, alt: 'Golden grain field ready for harvest' },
   { type: 'photo', label: 'Sorting and packing', title: 'Careful selection before packing', description: 'Fresh produce selected and prepared for its journey to market.', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=85', alt: 'Fresh produce arranged for market' },
   { type: 'video', label: 'Grains to market', title: showcaseVideos[1].title, description: showcaseVideos[1].description, video: showcaseVideos[1].url, poster: productCategories[2].image },
+  { type: 'video', label: 'Harvest in motion', title: showcaseVideos[2].title, description: showcaseVideos[2].description, video: showcaseVideos[2].url, poster: showcaseVideos[2].poster },
+  { type: 'video', label: 'Farm to market', title: showcaseVideos[3].title, description: showcaseVideos[3].description, video: showcaseVideos[3].url, poster: showcaseVideos[3].poster },
 ]
 
 const state = {
   cartItems: JSON.parse(localStorage.getItem('pahaditokri_cart') || '[]'),
   orderHistory: JSON.parse(localStorage.getItem('pahaditokri_orders') || '[]'),
   auth: JSON.parse(localStorage.getItem('pahaditokri_auth') || 'null'),
+  admin: JSON.parse(localStorage.getItem('pahaditokri_admin') || 'null'),
+  adminImages: [],
+  adminImagesLoaded: false,
 }
 const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 const root = document.querySelector('#root')
 const whatsappNumber = '917018777497'
 let razorpayScriptPromise
+let mediaObserver
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]))
 const parsePrice = (price) => Number(price.replace(/[^0-9.]/g, '')) || 0
 const itemWithCartData = (item, categoryName, quantity = 1) => ({ ...item, id: `${categoryName}-${item.name}`, sku: `${categoryName}-${item.name}`.toLowerCase().replaceAll(' ', '-'), categoryName, quantity, priceNumber: parsePrice(item.price) })
-const allProducts = productCategories.flatMap((category) => category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name })))
+let allProducts = productCategories.flatMap((category) => category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name })))
 const saveState = () => {
   localStorage.setItem('pahaditokri_cart', JSON.stringify(state.cartItems))
   localStorage.setItem('pahaditokri_orders', JSON.stringify(state.orderHistory))
   localStorage.setItem('pahaditokri_auth', JSON.stringify(state.auth))
+  localStorage.setItem('pahaditokri_admin', JSON.stringify(state.admin))
 }
 const cartItemCount = () => state.cartItems.reduce((total, item) => total + item.quantity, 0)
 const link = (path, label, className = '') => `<a href="${path}" class="${className}" data-route>${label}</a>`
 const whatsappLink = (message) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+
+function updateCatalogImages(categories) {
+  for (const updatedCategory of categories) {
+    const category = productCategories.find((entry) => entry.slug === updatedCategory.slug)
+    if (!category) continue
+    category.image = updatedCategory.image
+    for (const updatedItem of updatedCategory.items) {
+      const item = category.items.find((entry) => entry.sku === updatedItem.sku)
+      if (item) item.image = updatedItem.image
+    }
+  }
+  farmMedia[1].image = productCategories[0].items[0].image
+  farmMedia[2].poster = productCategories[0].items[1].image
+  farmMedia[3].image = productCategories[2].image
+  farmMedia[5].poster = productCategories[2].image
+  allProducts = productCategories.flatMap((category) => category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name })))
+  state.cartItems = state.cartItems.map((cartItem) => ({
+    ...cartItem,
+    image: allProducts.find((item) => item.sku === cartItem.sku)?.image ?? cartItem.image,
+  }))
+  saveState()
+}
+
+async function loadCatalogImages() {
+  const response = await fetch(`${API_BASE_URL}/api/products`)
+  if (!response.ok) throw new Error('Product images could not be loaded.')
+  const result = await response.json()
+  if (Array.isArray(result.categories)) updateCatalogImages(result.categories)
+  if (window.location.pathname !== '/admin') render()
+}
 
 function productCard(item) {
   const reference = `${item.categorySlug}|${item.name}`
@@ -117,7 +165,11 @@ function markClicked(element, message) {
 }
 
 function header() {
-  const accountLinks = state.auth ? `<span class="account-name">Hi, ${escapeHtml(state.auth.user.name)}</span><button type="button" class="header-action" data-logout>Logout</button>` : `${link('/login', 'Login')} ${link('/register', 'Register')}`
+  const accountLinks = state.admin
+    ? `${link('/admin', 'Image Admin')}<span class="account-name">Hi, Admin</span><button type="button" class="header-action" data-admin-logout>Logout</button>`
+    : state.auth
+      ? `<span class="account-name">Hi, ${escapeHtml(state.auth.user.name)}</span><button type="button" class="header-action" data-logout>Logout</button>`
+      : `${link('/login', 'Login')} ${link('/register', 'Register')}`
   return `<header class="site-header"><div class="brand"><img src="${pahadiTokriLogo}" alt="PahadiTokri logo"></div><nav>${link('/', 'Home')} ${link('/about', 'About')} ${link('/farm', 'Farm Stories')} ${link('/products', 'Products')} ${link('/cart', `Cart (${cartItemCount()})`)} ${link('/contact-us', 'Contact Us')} ${accountLinks}</nav></header>`
 }
 
@@ -157,16 +209,17 @@ function homePage() {
     <section class="section-block why-section"><p class="eyebrow">The PahadiTokri promise</p><h2>Why PahadiTokri?</h2><div class="why-grid"><article><span aria-hidden="true">01</span><h3>Fresh quality</h3><p>Thoughtfully selected products from the current catalogue.</p></article><article><span aria-hidden="true">02</span><h3>Local roots</h3><p>We’re based in Kotkhai, Shimla, Himachal Pradesh.</p></article><article><span aria-hidden="true">03</span><h3>Simple ordering</h3><p>Choose your quantity, review the delivery charge, and order online.</p></article></div></section>
     <section class="section-block reviews-section"><p class="eyebrow">Your experience matters</p><h2>Customer Reviews</h2><p>Verified customer feedback will appear here as we collect it. We don’t publish unverified testimonials.</p></section>
     <section class="section-block delivery-section"><div><p class="eyebrow">Before you order</p><h2>Delivery Information</h2><p>Delivery charge: ₹49 per order. Delivery areas and estimated timing are confirmed for your address—message us on WhatsApp before ordering if you’d like to check.</p></div><a class="btn primary" href="${whatsappLink('Hello PahadiTokri, please confirm delivery availability and estimated timing for my area.')}" target="_blank" rel="noopener noreferrer">Check delivery on WhatsApp</a></section>
-    <section class="section-block"><h2>PahadiTokri In Motion</h2><div class="video-showcase-grid">${showcaseVideos.map((video) => `<article class="video-card"><video autoplay muted loop playsinline preload="metadata"><source src="${video.url}" type="video/mp4"></video><div class="video-card-content"><h3>${video.title}</h3><p>${video.description}</p><button type="button" class="video-control-btn" data-video-toggle>Pause Video</button></div></article>`).join('')}</div></section>
+    <section class="section-block video-showcase-section"><div class="section-heading"><div><p class="eyebrow">From the fields</p><h2>PahadiTokri In Motion</h2><p class="section-caption">Short glimpses of harvest, growers and the journey from farm to market.</p></div><span class="video-live-badge"><span aria-hidden="true"></span> Farm stories</span></div><div class="video-showcase-grid">${showcaseVideos.map((video) => `<article class="video-card"><div class="video-card-visual"><video muted loop playsinline preload="none" poster="${video.poster}" data-auto-play><source src="${video.url}" type="video/mp4"></video><span class="video-card-play-mark" aria-hidden="true">▶</span></div><div class="video-card-content"><h3>${video.title}</h3><p>${video.description}</p><button type="button" class="video-control-btn" data-video-toggle>Play Video</button></div></article>`).join('')}</div></section>
   </div>`
 }
 
 function farmStoriesPage() {
   const cards = farmMedia.map((item) => {
     const visual = item.type === 'video'
-      ? `<video controls playsinline preload="none" poster="${item.poster}" aria-label="${item.title}"><source src="${item.video}" type="video/mp4"></video>`
+      ? `<video muted loop playsinline preload="none" poster="${item.poster}" aria-label="${item.title}" data-auto-play><source src="${item.video}" type="video/mp4"></video>`
       : `<img src="${item.image}" alt="${item.alt}" loading="lazy">`
-    return `<article class="farm-media-card" data-media-type="${item.type}"><div class="farm-media-visual">${visual}<span class="farm-media-badge">${item.type === 'video' ? 'Video' : 'Photo'}</span></div><div class="farm-media-content"><p class="farm-media-label">${item.label}</p><h2>${item.title}</h2><p>${item.description}</p></div></article>`
+    const videoAction = item.type === 'video' ? '<button type="button" class="video-control-btn" data-video-toggle>Play Video</button>' : ''
+    return `<article class="farm-media-card" data-media-type="${item.type}"><div class="farm-media-visual">${visual}<span class="farm-media-badge">${item.type === 'video' ? 'Video' : 'Photo'}</span></div><div class="farm-media-content"><p class="farm-media-label">${item.label}</p><h2>${item.title}</h2><p>${item.description}</p>${videoAction}</div></article>`
   }).join('')
   return `<div class="farm-layout"><section class="farm-hero"><div><p class="eyebrow">Field notes</p><h1>Farm Stories</h1><p>Follow the journey from growing season to market through photos and videos of harvests, grains, and fresh produce.</p><div class="hero-actions">${link('/products', 'Shop the Harvest', 'btn primary')}</div></div><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85" alt="Green fields in a mountain valley" fetchpriority="high"></section><section class="farm-gallery" aria-label="Farm photos and videos"><div class="farm-gallery-heading"><div><p class="eyebrow">From the fields</p><h2>Harvest to market</h2></div><p id="farm-result-count" aria-live="polite">${farmMedia.length} stories</p></div><div class="farm-filter-list" role="group" aria-label="Filter farm stories"><button type="button" class="farm-filter-btn" data-farm-filter="all" aria-pressed="true">All</button><button type="button" class="farm-filter-btn" data-farm-filter="photo" aria-pressed="false">Photos</button><button type="button" class="farm-filter-btn" data-farm-filter="video" aria-pressed="false">Videos</button></div><div class="farm-media-grid">${cards}</div></section></div>`
 }
@@ -210,6 +263,16 @@ function authPage(mode) {
   return `<section class="page-card section-block auth-page"><p class="eyebrow">PahadiTokri Account</p><h1>${isRegister ? 'Create your account' : 'Welcome back'}</h1><p>${isRegister ? 'Register to keep your details ready for every order.' : 'Login to continue shopping with PahadiTokri.'}</p><form class="contact-form" id="${isRegister ? 'register-form' : 'login-form'}">${isRegister ? '<label for="auth-name">Full Name</label><input id="auth-name" name="name" autocomplete="name" required>' : ''}<label for="auth-email">Email</label><input id="auth-email" name="email" type="email" autocomplete="email" required><label for="auth-password">Password</label><input id="auth-password" name="password" type="password" minlength="8" autocomplete="${isRegister ? 'new-password' : 'current-password'}" required><button type="submit">${isRegister ? 'Register' : 'Login'}</button></form><p class="auth-switch">${isRegister ? `Already have an account? ${link('/login', 'Login')}` : `New to PahadiTokri? ${link('/register', 'Create an account')}`}</p><p class="form-success" id="auth-success" hidden></p></section>`
 }
 
+function adminPage() {
+  if (!state.admin) {
+    return `<section class="page-card section-block auth-page"><p class="eyebrow">Store management</p><h1>Admin login</h1><p>Sign in to manage product and category images.</p><form class="contact-form" id="admin-login-form"><label for="admin-email">Admin email</label><input id="admin-email" name="email" type="email" autocomplete="username" required><label for="admin-password">Password</label><input id="admin-password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form></section>`
+  }
+
+  const targets = state.adminImages.map((entry) => `<option value="${escapeHtml(entry.target)}">${escapeHtml(entry.label)}</option>`).join('')
+  const imageCards = state.adminImages.map((entry) => `<article class="admin-image-card"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.label)}" loading="lazy"><div><h3>${escapeHtml(entry.label)}</h3><p>${entry.customized ? 'Custom image' : 'Built-in image'}</p>${entry.customized ? `<button type="button" class="remove-btn" data-admin-image-delete="${escapeHtml(entry.target)}">Remove custom image</button>` : ''}</div></article>`).join('')
+  return `<div class="admin-layout"><section class="page-card section-block"><p class="eyebrow">Store management</p><h1>Manage storefront images</h1><p>Upload an image for a product or category. Removing a custom image restores the built-in image.</p><form class="contact-form" id="admin-image-form"><label for="admin-image-target">Image placement</label><select id="admin-image-target" name="target" required>${targets}</select><label for="admin-image-file">Image file (JPEG, PNG, WebP, or GIF; up to 2 MB)</label><input id="admin-image-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required><button type="submit" ${state.adminImagesLoaded ? '' : 'disabled'}>Upload image</button></form></section><section class="page-card section-block"><h2>Current images</h2>${state.adminImagesLoaded ? `<div class="admin-image-grid">${imageCards}</div>` : '<p>Loading image list…</p>'}</section></div>`
+}
+
 function pageContent(path) {
   if (path === '/') return homePage()
   if (path === '/about') return aboutPage()
@@ -220,18 +283,68 @@ function pageContent(path) {
   if (path === '/contact-us') return contactPage()
   if (path === '/login') return authPage('login')
   if (path === '/register') return authPage('register')
+  if (path === '/admin') return adminPage()
   return homePage()
 }
 
 function render() {
+  mediaObserver?.disconnect()
+  root.querySelectorAll('video[data-auto-play]').forEach((video) => video.pause())
   const path = window.location.pathname
   root.innerHTML = `<div class="site-shell">${header()}<main class="site-main">${pageContent(path)}</main><footer class="site-footer"><p>© ${new Date().getFullYear()} PahadiTokri. Freshness Delivered Daily.</p></footer></div><a class="floating-whatsapp" href="${whatsappLink('Hello PahadiTokri, I have a question about an order.')}" target="_blank" rel="noopener noreferrer" aria-label="Contact PahadiTokri on WhatsApp">WhatsApp</a><div id="toast-container" aria-live="polite"></div>`
   const search = document.querySelector('#product-search')
   if (search) applyCatalogFilters()
-  document.querySelectorAll('.video-card, .farm-media-card, .photo-story-card').forEach((card) => {
-    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { card.classList.add('in-view'); observer.disconnect() } }, { threshold: 0.25 })
-    observer.observe(card)
+  mediaObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const card = entry.target
+      const video = card.querySelector('video[data-auto-play]')
+      const toggle = card.querySelector('[data-video-toggle]')
+      if (entry.isIntersecting) {
+        card.classList.add('in-view')
+        if (video && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          video.play().then(() => {
+            card.classList.add('is-playing')
+            if (toggle) toggle.textContent = 'Pause Video'
+          }).catch(() => {
+            card.classList.remove('is-playing')
+            if (toggle) toggle.textContent = 'Play Video'
+          })
+        }
+      } else {
+        card.classList.remove('is-playing')
+        if (video) {
+          video.pause()
+          if (toggle) toggle.textContent = 'Play Video'
+        }
+        card.classList.remove('in-view')
+      }
+    }
+  }, { threshold: 0.25 })
+  document.querySelectorAll('.section-block, .video-card, .farm-media-card, .photo-story-card, .catalog-product-card').forEach((card) => {
+    mediaObserver.observe(card)
   })
+  if (path === '/admin' && state.admin && !state.adminImagesLoaded) void loadAdminImages()
+}
+
+async function loadAdminImages() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/images`, {
+      headers: { Authorization: `Bearer ${state.admin.token}` },
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(result.error || 'Images could not be loaded.')
+    state.adminImages = result.images
+    state.adminImagesLoaded = true
+    if (window.location.pathname === '/admin') render()
+  } catch (error) {
+    showToast(error.message || 'Images could not be loaded.', 'error')
+    if (error.message === 'Admin login is required.') {
+      state.admin = null
+      state.adminImagesLoaded = false
+      saveState()
+      if (window.location.pathname === '/admin') render()
+    }
+  }
 }
 
 function findItem(reference) {
@@ -261,6 +374,16 @@ function navigate(path) {
 }
 
 document.addEventListener('click', (event) => {
+  const adminLogout = event.target.closest('[data-admin-logout]')
+  if (adminLogout) {
+    state.admin = null
+    state.adminImages = []
+    state.adminImagesLoaded = false
+    saveState()
+    navigate('/')
+    showToast('Admin logged out')
+    return
+  }
   const logout = event.target.closest('[data-logout]')
   if (logout) {
     state.auth = null
@@ -276,7 +399,10 @@ document.addEventListener('click', (event) => {
     const selectedFilter = farmFilter.dataset.farmFilter
     document.querySelectorAll('[data-farm-filter]').forEach((button) => button.setAttribute('aria-pressed', String(button === farmFilter)))
     const cards = [...document.querySelectorAll('.farm-media-card')]
-    cards.forEach((card) => { card.hidden = selectedFilter !== 'all' && card.dataset.mediaType !== selectedFilter })
+    cards.forEach((card) => {
+      card.hidden = selectedFilter !== 'all' && card.dataset.mediaType !== selectedFilter
+      if (card.hidden) card.querySelector('video[data-auto-play]')?.pause()
+    })
     const visibleCount = cards.filter((card) => !card.hidden).length
     document.querySelector('#farm-result-count').textContent = `${visibleCount} ${visibleCount === 1 ? 'story' : 'stories'}`
     return
@@ -296,8 +422,29 @@ document.addEventListener('click', (event) => {
   if (decrease) { state.cartItems = state.cartItems.map((item) => item.id === decrease.dataset.decrease ? { ...item, quantity: item.quantity - 1 } : item).filter((item) => item.quantity > 0); saveState(); render(); showToast('Quantity decreased'); return }
   const remove = event.target.closest('[data-remove]')
   if (remove) { state.cartItems = state.cartItems.filter((item) => item.id !== remove.dataset.remove); saveState(); render(); showToast('Item removed'); return }
+  const removeAdminImage = event.target.closest('[data-admin-image-delete]')
+  if (removeAdminImage) {
+    void removeManagedImage(removeAdminImage.dataset.adminImageDelete)
+    return
+  }
   const toggle = event.target.closest('[data-video-toggle]')
-  if (toggle) { const video = toggle.closest('.video-card').querySelector('video'); if (video.paused) { video.play(); toggle.textContent = 'Pause Video'; markClicked(toggle, 'Video playing') } else { video.pause(); toggle.textContent = 'Play Video'; markClicked(toggle, 'Video paused') } }
+  if (toggle) {
+    const card = toggle.closest('.video-card, .farm-media-card')
+    const video = card?.querySelector('video')
+    if (!video) return
+    if (video.paused) {
+      video.play().then(() => {
+        card.classList.add('is-playing')
+        toggle.textContent = 'Pause Video'
+      }).catch(() => showToast('This video could not be played.', 'error'))
+      markClicked(toggle, 'Video playing')
+    } else {
+      video.pause()
+      card.classList.remove('is-playing')
+      toggle.textContent = 'Play Video'
+      markClicked(toggle, 'Video paused')
+    }
+  }
 })
 
 function applyCatalogFilters() {
@@ -331,6 +478,61 @@ document.addEventListener('change', (event) => {
 })
 
 document.addEventListener('submit', async (event) => {
+  if (event.target.id === 'admin-login-form') {
+    event.preventDefault()
+    const formData = Object.fromEntries(new FormData(event.target))
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Admin login failed.')
+      state.admin = result
+      state.adminImages = []
+      state.adminImagesLoaded = false
+      saveState()
+      render()
+      showToast('Welcome, admin')
+    } catch (error) {
+      showToast(error.message || 'Admin login failed.', 'error')
+    }
+    return
+  }
+  if (event.target.id === 'admin-image-form') {
+    event.preventDefault()
+    const formData = new FormData(event.target)
+    const file = formData.get('image')
+    if (!(file instanceof File) || !file.size) {
+      showToast('Select an image to upload.', 'error')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Images must be 2 MB or smaller.', 'error')
+      return
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/images?target=${encodeURIComponent(formData.get('target'))}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${state.admin.token}`,
+          'Content-Type': file.type,
+        },
+        body: file,
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Image could not be uploaded.')
+      event.target.reset()
+      state.adminImagesLoaded = false
+      await loadCatalogImages()
+      await loadAdminImages()
+      showToast('Image uploaded')
+    } catch (error) {
+      showToast(error.message || 'Image could not be uploaded.', 'error')
+    }
+    return
+  }
   if (event.target.id === 'register-form' || event.target.id === 'login-form') {
     event.preventDefault()
     const isRegister = event.target.id === 'register-form'
@@ -376,6 +578,7 @@ document.addEventListener('submit', async (event) => {
           items: state.cartItems.map((item) => ({ sku: item.sku, quantity: item.quantity })),
         }),
       })
+
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || 'Order could not be placed.')
       if (formData.paymentMethod === 'cod') {
@@ -431,6 +634,23 @@ document.addEventListener('submit', async (event) => {
   }
 })
 
+async function removeManagedImage(target) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/images/${encodeURIComponent(target)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${state.admin.token}` },
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(result.error || 'Image could not be removed.')
+    state.adminImagesLoaded = false
+    await loadCatalogImages()
+    await loadAdminImages()
+    showToast('Custom image removed')
+  } catch (error) {
+    showToast(error.message || 'Image could not be removed.', 'error')
+  }
+}
+
 function completeOrder(order, paymentMethod) {
   const itemCount = cartItemCount()
   state.orderHistory = [{
@@ -466,3 +686,4 @@ function completeOrder(order, paymentMethod) {
 
 window.addEventListener('popstate', render)
 render()
+loadCatalogImages().catch((error) => console.error(error))
