@@ -71,6 +71,7 @@ const state = {
   orderHistory: JSON.parse(localStorage.getItem('pahaditokri_orders') || '[]'),
   auth: JSON.parse(localStorage.getItem('pahaditokri_auth') || 'null'),
   admin: JSON.parse(localStorage.getItem('pahaditokri_admin') || 'null'),
+  adminTab: 'products',
   storefrontImages: {},
   photoStories: [],
   adminImages: [],
@@ -309,14 +310,22 @@ function authPage(mode) {
 
 function adminPage() {
   if (!state.admin) {
-    return `<section class="page-card section-block auth-page"><p class="eyebrow">Store management</p><h1>Admin login</h1><p>Sign in with the store admin account to manage product details and images.</p><form class="contact-form" id="admin-login-form"><label for="admin-email">Admin email</label><input id="admin-email" name="email" type="email" autocomplete="username" required><label for="admin-password">Password</label><input id="admin-password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form></section>`
+    return `<section class="page-card section-block auth-page"><p class="eyebrow">Store management</p><h1>Admin login</h1><p>Sign in with the store admin account to manage product details and images.</p><form class="contact-form" id="admin-login-form"><label for="admin-email">Admin email</label><input id="admin-email" name="email" type="email" value="rosey232chauhan@gmail.com" autocomplete="username" required><label for="admin-password">Password</label><input id="admin-password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form></section>`
   }
 
-  const targets = state.adminImages.map((entry) => `<option value="${escapeHtml(entry.target)}">${escapeHtml(entry.label)}</option>`).join('')
-  const imageCards = state.adminImages.map((entry) => `<article class="admin-image-card"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.label)}" loading="lazy"><div><h3>${escapeHtml(entry.label)}</h3><p>${entry.customized ? 'Custom image' : 'Built-in image'}</p>${entry.customized ? `<button type="button" class="remove-btn" data-admin-image-delete="${escapeHtml(entry.target)}">Remove custom image</button>` : ''}</div></article>`).join('')
-  const productCards = state.adminProducts.map((product) => `<article class="admin-product-card"><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.categoryName)}</p><form class="contact-form admin-product-form" data-admin-product-form data-sku="${escapeHtml(product.sku)}"><label>Product name<input name="name" value="${escapeHtml(product.name)}" maxlength="100" required></label><label>Description<textarea name="info" rows="3" maxlength="500" required>${escapeHtml(product.info)}</textarea></label><label>Price per kg (₹)<input name="priceInRupees" type="number" min="0.01" max="100000" step="0.01" value="${product.priceInRupees}" required></label><label class="admin-product-availability"><input name="isAvailable" type="checkbox" ${product.isAvailable ? 'checked' : ''}><span>Available for orders</span></label><button type="submit">Save product</button></form></article>`).join('')
+  const activeTab = ['products', 'images', 'photos'].includes(state.adminTab) ? state.adminTab : 'products'
+  const imageType = (target) => target.startsWith('category:') ? 'category' : 'storefront'
+  const storefrontImageCards = state.adminImages
+    .filter((entry) => !entry.target.startsWith('product:'))
+    .map((entry) => `<article class="admin-image-card" data-admin-image-card data-image-type="${imageType(entry.target)}" data-image-search="${escapeHtml(entry.label.toLowerCase())}"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.label)}" loading="lazy"><div><p class="admin-card-eyebrow">${entry.target.startsWith('category:') ? 'Category' : 'Storefront'}</p><h3>${escapeHtml(entry.label)}</h3><p>${entry.customized ? 'Custom image' : 'Default image'}</p><form class="admin-image-upload-form" data-admin-image-form data-target="${escapeHtml(entry.target)}"><label class="admin-file-label">Choose a new photo<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label><button type="submit" class="btn secondary">Upload photo</button></form>${entry.customized ? `<button type="button" class="remove-btn" data-admin-image-delete="${escapeHtml(entry.target)}">Restore default image</button>` : ''}</div></article>`).join('')
+  const productCards = state.adminProducts.map((product) => {
+    const imageTarget = `product:${product.sku}`
+    const managedImage = state.adminImages.find((entry) => entry.target === imageTarget)
+    const image = managedImage?.image || product.image
+    return `<article class="admin-product-card" data-admin-product-card data-product-search="${escapeHtml(`${product.name} ${product.categoryName}`.toLowerCase())}" data-product-category="${escapeHtml(product.categorySlug)}"><div class="admin-product-preview"><img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}" loading="lazy"><span>${product.isAvailable ? 'Available' : 'Currently unavailable'}</span></div><div class="admin-product-editor"><p class="admin-card-eyebrow">${escapeHtml(product.categoryName)}</p><h3>${escapeHtml(product.name)}</h3><form class="contact-form admin-product-form" data-admin-product-form data-sku="${escapeHtml(product.sku)}"><label>Product name<input name="name" value="${escapeHtml(product.name)}" maxlength="100" required></label><label>Description<textarea name="info" rows="3" maxlength="500" required>${escapeHtml(product.info)}</textarea></label><label>Price per kg (₹)<input name="priceInRupees" type="number" min="0.01" max="100000" step="0.01" value="${product.priceInRupees}" required></label><label class="admin-product-availability"><input name="isAvailable" type="checkbox" ${product.isAvailable ? 'checked' : ''}><span>Available for orders</span></label><button type="submit" class="btn primary">Save product changes</button></form><form class="admin-image-upload-form" data-admin-image-form data-target="${escapeHtml(imageTarget)}"><label class="admin-file-label">Change product photo<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label><button type="submit" class="btn secondary">Upload photo</button></form>${managedImage?.customized ? `<button type="button" class="remove-btn" data-admin-image-delete="${escapeHtml(imageTarget)}">Restore default photo</button>` : ''}<button type="button" class="remove-btn admin-product-remove" data-admin-product-delete="${escapeHtml(product.sku)}">Remove product</button></div></article>`
+  }).join('')
   const photoStoryCards = state.adminPhotoStories.map((story) => `<article class="admin-image-card"><img src="${escapeHtml(story.image)}" alt="${escapeHtml(story.title)}" loading="lazy"><div><h3>${escapeHtml(story.title)}</h3><p>${escapeHtml(story.label)}</p><button type="button" class="remove-btn" data-admin-photo-delete="${escapeHtml(story.id)}">Remove photo story</button></div></article>`).join('')
-  return `<div class="admin-layout"><section class="page-card section-block"><p class="eyebrow">Store management</p><h1>Manage your store</h1><p>Update product details, pricing, availability, and images. Changes are saved to the backend and appear on the storefront.</p></section><section class="page-card section-block"><h2>Product details</h2>${state.adminImagesLoaded ? `<div class="admin-product-grid">${productCards}</div>` : '<p>Loading products…</p>'}</section><section class="page-card section-block"><h2>Add a photo story</h2><p>Add a new photo to the homepage gallery, or remove one of your custom stories below.</p><form class="contact-form" id="admin-photo-story-form"><label for="admin-photo-title">Photo title</label><input id="admin-photo-title" name="title" maxlength="120" required><label for="admin-photo-label">Short label</label><input id="admin-photo-label" name="label" maxlength="60" required><label for="admin-photo-description">Description (optional)</label><textarea id="admin-photo-description" name="description" rows="2" maxlength="240"></textarea><label for="admin-photo-file">Photo (JPEG, PNG, WebP, or GIF; up to 2 MB)</label><input id="admin-photo-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required><button type="submit" ${state.adminImagesLoaded ? '' : 'disabled'}>Add photo story</button></form>${state.adminImagesLoaded && photoStoryCards ? `<div class="admin-image-grid">${photoStoryCards}</div>` : ''}</section><section class="page-card section-block"><h2>Storefront images</h2><p>Replace images across the catalogue and storefront. Removing a custom image restores the built-in image.</p><form class="contact-form" id="admin-image-form"><label for="admin-image-target">Image placement</label><select id="admin-image-target" name="target" required>${targets}</select><label for="admin-image-file">Image file (JPEG, PNG, WebP, or GIF; up to 2 MB)</label><input id="admin-image-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required><button type="submit" ${state.adminImagesLoaded ? '' : 'disabled'}>Upload image</button></form></section><section class="page-card section-block"><h2>Current images</h2>${state.adminImagesLoaded ? `<div class="admin-image-grid">${imageCards}</div>` : '<p>Loading image list…</p>'}</section></div>`
+  return `<div class="admin-layout"><section class="page-card section-block admin-welcome"><p class="eyebrow">Your store dashboard</p><h1>What would you like to update?</h1><p>Choose a section below. Your changes save to the store and appear on the website after saving.</p><div class="admin-summary"><span><strong>${state.adminProducts.length}</strong> products</span><span><strong>${state.adminImages.filter((imageEntry) => imageEntry.customized).length}</strong> custom images</span><span><strong>${state.adminPhotoStories.length}</strong> extra homepage photos</span></div></section><nav class="admin-tabs" aria-label="Store management sections">${[['products', 'Products & prices'], ['images', 'Website photos'], ['photos', 'Homepage gallery']].map(([tab, label]) => `<button type="button" class="admin-tab${activeTab === tab ? ' is-active' : ''}" data-admin-tab="${tab}" aria-selected="${activeTab === tab}">${label}</button>`).join('')}</nav><section class="page-card section-block admin-panel" data-admin-panel="products" ${activeTab !== 'products' ? 'hidden' : ''}><div class="admin-panel-heading"><div><h2>Products & prices</h2><p>Find a product, change its details or price, and save. Prices are per kilogram.</p></div><span class="admin-count">${state.adminProducts.length} products</span></div><form class="admin-create-product" id="admin-product-create-form"><h3>Add a product</h3><div class="admin-product-create-grid"><label>Product name<input name="name" maxlength="100" placeholder="For example, Himachali Rajma" required></label><label>Category<select name="categorySlug" required>${productCategories.map((category) => `<option value="${category.slug}">${escapeHtml(category.name)}</option>`).join('')}</select></label><label>Price per kg (₹)<input name="priceInRupees" type="number" min="0.01" max="100000" step="0.01" placeholder="0.00" required></label><label class="admin-product-create-description">Short description<textarea name="info" rows="2" maxlength="500" placeholder="A short description customers will see." required></textarea></label></div><p>After adding, you can upload a product photo below its card.</p><button type="submit" class="btn primary">Add product</button></form><div class="admin-filters"><label>Find a product<input type="search" id="admin-product-search" placeholder="Search by name" autocomplete="off"></label><label>Category<select id="admin-product-category"><option value="">All categories</option>${productCategories.map((category) => `<option value="${category.slug}">${escapeHtml(category.name)}</option>`).join('')}</select></label></div><div class="admin-product-grid">${productCards}</div><p class="admin-no-results" id="admin-product-empty" hidden>No products match your search.</p></section><section class="page-card section-block admin-panel" data-admin-panel="images" ${activeTab !== 'images' ? 'hidden' : ''}><div class="admin-panel-heading"><div><h2>Website photos</h2><p>Select a new photo next to the place you want to update. You can restore the original anytime.</p></div><span class="admin-count">${storefrontImageCards ? state.adminImages.filter((imageEntry) => !imageEntry.target.startsWith('product:')).length : 0} image spots</span></div><div class="admin-filters"><label>Find a photo spot<input type="search" id="admin-image-search" placeholder="Search images" autocomplete="off"></label><label>Show<select id="admin-image-type"><option value="">All photo spots</option><option value="category">Category photos</option><option value="storefront">Other website photos</option></select></label></div><div class="admin-image-grid">${storefrontImageCards}</div><p class="admin-no-results" id="admin-image-empty" hidden>No photo spots match your search.</p></section><section class="page-card section-block admin-panel" data-admin-panel="photos" ${activeTab !== 'photos' ? 'hidden' : ''}><div class="admin-panel-heading"><div><h2>Homepage gallery</h2><p>Add or remove extra photos shown in the “Fresh from the hills” section.</p></div><span class="admin-count">${state.adminPhotoStories.length} extra photos</span></div><form class="contact-form admin-photo-story-form" id="admin-photo-story-form"><label for="admin-photo-title">Photo title</label><input id="admin-photo-title" name="title" maxlength="120" placeholder="Example: Fresh apples from the orchard" required><label for="admin-photo-label">Small label<input id="admin-photo-label" name="label" maxlength="60" placeholder="Example: Apple harvest" required></label><label for="admin-photo-description">Short description (optional)<textarea id="admin-photo-description" name="description" rows="2" maxlength="240" placeholder="Tell customers a little about this photo."></textarea></label><label for="admin-photo-file">Choose a photo (JPEG, PNG, WebP or GIF; up to 2 MB)<input id="admin-photo-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label><button type="submit" class="btn primary">Add photo to homepage</button></form><div class="admin-image-grid">${photoStoryCards || '<p class="admin-empty-note">No extra homepage photos yet. Add one using the form above.</p>'}</div></section></div>`
 }
 
 function pageContent(path) {
@@ -437,6 +446,12 @@ function navigate(path) {
 }
 
 document.addEventListener('click', (event) => {
+  const adminTab = event.target.closest('[data-admin-tab]')
+  if (adminTab) {
+    state.adminTab = adminTab.dataset.adminTab
+    render()
+    return
+  }
   const adminLogout = event.target.closest('[data-admin-logout]')
   if (adminLogout) {
     state.admin = null
@@ -489,11 +504,19 @@ document.addEventListener('click', (event) => {
   if (remove) { state.cartItems = state.cartItems.filter((item) => item.id !== remove.dataset.remove); saveState(); render(); showToast('Item removed'); return }
   const removeAdminImage = event.target.closest('[data-admin-image-delete]')
   if (removeAdminImage) {
+    if (!window.confirm('Restore the original photo? The custom photo will be removed.')) return
     void removeManagedImage(removeAdminImage.dataset.adminImageDelete)
+    return
+  }
+  const removeAdminProduct = event.target.closest('[data-admin-product-delete]')
+  if (removeAdminProduct) {
+    if (!window.confirm('Remove this product from the store? Customers will no longer be able to order it.')) return
+    void removeCatalogProductAdmin(removeAdminProduct.dataset.adminProductDelete)
     return
   }
   const removeAdminPhoto = event.target.closest('[data-admin-photo-delete]')
   if (removeAdminPhoto) {
+    if (!window.confirm('Remove this photo from the homepage?')) return
     void removeManagedPhotoStory(removeAdminPhoto.dataset.adminPhotoDelete)
     return
   }
@@ -541,11 +564,45 @@ function applyCatalogFilters() {
 
 document.addEventListener('input', (event) => {
   if (event.target.matches('#product-search, #product-min-price, #product-max-price')) applyCatalogFilters()
+  if (event.target.matches('#admin-product-search')) applyAdminProductFilters()
+  if (event.target.matches('#admin-image-search')) applyAdminImageFilters()
 })
 
 document.addEventListener('change', (event) => {
   if (event.target.matches('#product-category-filter')) applyCatalogFilters()
+  if (event.target.matches('#admin-product-category')) applyAdminProductFilters()
+  if (event.target.matches('#admin-image-type')) applyAdminImageFilters()
 })
+
+function applyAdminProductFilters() {
+  const search = document.querySelector('#admin-product-search')?.value.trim().toLowerCase() || ''
+  const category = document.querySelector('#admin-product-category')?.value || ''
+  const cards = [...document.querySelectorAll('[data-admin-product-card]')]
+  let visible = 0
+  for (const card of cards) {
+    const matches = card.dataset.productSearch.includes(search)
+      && (!category || card.dataset.productCategory === category)
+    card.hidden = !matches
+    if (matches) visible += 1
+  }
+  const empty = document.querySelector('#admin-product-empty')
+  if (empty) empty.hidden = visible > 0
+}
+
+function applyAdminImageFilters() {
+  const search = document.querySelector('#admin-image-search')?.value.trim().toLowerCase() || ''
+  const type = document.querySelector('#admin-image-type')?.value || ''
+  const cards = [...document.querySelectorAll('[data-admin-image-card]')]
+  let visible = 0
+  for (const card of cards) {
+    const matches = card.dataset.imageSearch.includes(search)
+      && (!type || card.dataset.imageType === type)
+    card.hidden = !matches
+    if (matches) visible += 1
+  }
+  const empty = document.querySelector('#admin-image-empty')
+  if (empty) empty.hidden = visible > 0
+}
 
 document.addEventListener('submit', async (event) => {
   if (event.target.id === 'admin-login-form') {
@@ -615,6 +672,40 @@ document.addEventListener('submit', async (event) => {
     }
     return
   }
+  if (event.target.id === 'admin-product-create-form') {
+    event.preventDefault()
+    const form = event.target
+    const formData = new FormData(form)
+    const submitButton = form.querySelector('button[type="submit"]')
+    submitButton.disabled = true
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${state.admin.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.get('name'),
+          info: formData.get('info'),
+          priceInRupees: Number(formData.get('priceInRupees')),
+          categorySlug: formData.get('categorySlug'),
+        }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Product could not be added.')
+      form.reset()
+      await loadCatalogImages()
+      state.adminImagesLoaded = false
+      await loadAdminImages()
+      showToast('Product added')
+    } catch (error) {
+      showToast(error.message || 'Product could not be added.', 'error')
+    } finally {
+      submitButton.disabled = false
+    }
+    return
+  }
   if (event.target.matches('[data-admin-product-form]')) {
     event.preventDefault()
     const form = event.target
@@ -648,9 +739,10 @@ document.addEventListener('submit', async (event) => {
     }
     return
   }
-  if (event.target.id === 'admin-image-form') {
+  if (event.target.matches('[data-admin-image-form]')) {
     event.preventDefault()
-    const formData = new FormData(event.target)
+    const form = event.target
+    const formData = new FormData(form)
     const file = formData.get('image')
     if (!(file instanceof File) || !file.size) {
       showToast('Select an image to upload.', 'error')
@@ -660,8 +752,10 @@ document.addEventListener('submit', async (event) => {
       showToast('Images must be 2 MB or smaller.', 'error')
       return
     }
+    const submitButton = form.querySelector('button[type="submit"]')
+    submitButton.disabled = true
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/images?target=${encodeURIComponent(formData.get('target'))}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/images?target=${encodeURIComponent(form.dataset.target)}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${state.admin.token}`,
@@ -671,13 +765,15 @@ document.addEventListener('submit', async (event) => {
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || 'Image could not be uploaded.')
-      event.target.reset()
+      form.reset()
       state.adminImagesLoaded = false
       await loadCatalogImages()
       await loadAdminImages()
       showToast('Image uploaded')
     } catch (error) {
       showToast(error.message || 'Image could not be uploaded.', 'error')
+    } finally {
+      submitButton.disabled = false
     }
     return
   }
@@ -796,6 +892,23 @@ async function removeManagedImage(target) {
     showToast('Custom image removed')
   } catch (error) {
     showToast(error.message || 'Image could not be removed.', 'error')
+  }
+}
+
+async function removeCatalogProductAdmin(sku) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/products/${encodeURIComponent(sku)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${state.admin.token}` },
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(result.error || 'Product could not be removed.')
+    await loadCatalogImages()
+    state.adminImagesLoaded = false
+    await loadAdminImages()
+    showToast('Product removed')
+  } catch (error) {
+    showToast(error.message || 'Product could not be removed.', 'error')
   }
 }
 

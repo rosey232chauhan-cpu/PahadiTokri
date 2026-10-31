@@ -3,7 +3,7 @@ import express, { Router } from 'express'
 import { productCategories } from '../data/products.js'
 import { storefrontImageTargets } from '../data/storefront-images.js'
 import { createToken, isTokenSecretConfigured, verifyToken } from '../services/tokens.js'
-import { getProductCatalog, updateCatalogProduct } from '../store/catalog.js'
+import { addCatalogProduct, getProductCatalog, removeCatalogProduct, updateCatalogProduct } from '../store/catalog.js'
 import { deleteManagedImage, listManagedImages, saveManagedImage } from '../store/images.js'
 import { deletePhotoStory, listPhotoStories, savePhotoStory } from '../store/photo-stories.js'
 
@@ -227,10 +227,55 @@ router.get('/products', requireAdmin, async (_req, res) => {
     res.json({ products: categories.flatMap((category) => category.items.map((item) => ({
       ...item,
       categoryName: category.name,
+      categorySlug: category.slug,
     }))) })
   } catch (error) {
     console.error('Unable to load admin product list:', error)
     res.status(500).json({ error: 'Products could not be loaded.' })
+  }
+})
+
+router.post('/products', requireAdmin, async (req, res) => {
+  const { name, info, priceInRupees, categorySlug } = req.body ?? {}
+  const price = Number(priceInRupees)
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) {
+    return res.status(400).json({ error: 'Product name must be between 1 and 100 characters.' })
+  }
+  if (typeof info !== 'string' || !info.trim() || info.trim().length > 500) {
+    return res.status(400).json({ error: 'Product description must be between 1 and 500 characters.' })
+  }
+  if (!Number.isFinite(price) || price <= 0 || price > 100000) {
+    return res.status(400).json({ error: 'Price must be greater than ₹0 and no more than ₹100,000 per kg.' })
+  }
+  if (typeof categorySlug !== 'string' || !productCategories.some((category) => category.slug === categorySlug)) {
+    return res.status(400).json({ error: 'Choose a valid product category.' })
+  }
+  try {
+    const product = await addCatalogProduct({
+      name: name.trim(),
+      info: info.trim(),
+      priceInRupees: Math.round(price * 100) / 100,
+      categorySlug,
+    })
+    res.status(201).json({ product })
+  } catch (error) {
+    console.error('Unable to add admin product:', error)
+    res.status(500).json({ error: 'Product could not be added.' })
+  }
+})
+
+router.delete('/products/:sku', requireAdmin, async (req, res) => {
+  try {
+    const categories = await getProductCatalog()
+    const exists = categories.some((category) => category.items.some((item) => item.sku === req.params.sku))
+    if (!exists) return res.status(404).json({ error: 'Product not found.' })
+    await deleteManagedImage(`product:${req.params.sku}`)
+    const removed = await removeCatalogProduct(req.params.sku)
+    if (!removed) return res.status(404).json({ error: 'Product not found.' })
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Unable to remove admin product:', error)
+    res.status(500).json({ error: 'Product could not be removed.' })
   }
 })
 
