@@ -9,11 +9,11 @@ router.get('/:imageId', async (req, res) => {
     if (!image) return res.status(404).json({ error: 'Image not found.' })
     res.set({
       'Content-Type': image.mimeType,
-      'Content-Length': Buffer.byteLength(image.data, 'base64'),
+      'Content-Length': image.data.length,
       'Cache-Control': 'public, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
     })
-    res.end(Buffer.from(image.data, 'base64'))
+    res.end(image.data)
   } catch (error) {
     console.error('Unable to load image:', error)
     res.status(500).json({ error: 'Image could not be loaded.' })

@@ -842,6 +842,41 @@ a.is-clicked {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.admin-product-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.admin-product-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #dce9df;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-product-card h3 {
+  margin: 0 0 0.25rem;
+  color: #124b34;
+}
+
+.admin-product-card > p {
+  margin: 0;
+  color: #5b715f;
+}
+
+.admin-product-availability {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.contact-form .admin-product-availability input[type="checkbox"] {
+  width: auto;
+  accent-color: #0e7a4d;
+}
+
 .admin-image-card {
   overflow: hidden;
   border: 1px solid #dce9df;

@@ -1,8 +1,9 @@
 import fs from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { getStore } from '@netlify/blobs'
 
-const dataDir = process.env.DATA_DIR || path.join('/tmp', 'pahaditokri-data')
+const dataDir = process.env.DATA_DIR || path.join(tmpdir(), 'pahaditokri-data')
 const ordersFile = path.join(dataDir, 'orders.json')
 const contactsFile = path.join(dataDir, 'contacts.json')
 const useNetlifyBlobs = process.env.NETLIFY === 'true'

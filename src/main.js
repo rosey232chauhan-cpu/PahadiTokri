@@ -64,11 +64,18 @@ const farmMedia = [
 ]
 
 const state = {
-  cartItems: JSON.parse(localStorage.getItem('pahaditokri_cart') || '[]'),
+  cartItems: JSON.parse(localStorage.getItem('pahaditokri_cart') || '[]').map((item) => ({
+    ...item,
+    id: item.sku || item.id,
+  })),
   orderHistory: JSON.parse(localStorage.getItem('pahaditokri_orders') || '[]'),
   auth: JSON.parse(localStorage.getItem('pahaditokri_auth') || 'null'),
   admin: JSON.parse(localStorage.getItem('pahaditokri_admin') || 'null'),
+  storefrontImages: {},
+  photoStories: [],
   adminImages: [],
+  adminProducts: [],
+  adminPhotoStories: [],
   adminImagesLoaded: false,
 }
 const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
@@ -78,7 +85,8 @@ let razorpayScriptPromise
 let mediaObserver
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]))
 const parsePrice = (price) => Number(price.replace(/[^0-9.]/g, '')) || 0
-const itemWithCartData = (item, categoryName, quantity = 1) => ({ ...item, id: `${categoryName}-${item.name}`, sku: `${categoryName}-${item.name}`.toLowerCase().replaceAll(' ', '-'), categoryName, quantity, priceNumber: parsePrice(item.price) })
+const itemWithCartData = (item, categoryName, quantity = 1) => ({ ...item, id: item.sku, categoryName, quantity, priceNumber: parsePrice(item.price) })
+const storefrontImage = (target, fallback) => state.storefrontImages[target] || fallback
 let allProducts = productCategories.flatMap((category) => category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name })))
 const saveState = () => {
   localStorage.setItem('pahaditokri_cart', JSON.stringify(state.cartItems))
@@ -90,25 +98,48 @@ const cartItemCount = () => state.cartItems.reduce((total, item) => total + item
 const link = (path, label, className = '') => `<a href="${path}" class="${className}" data-route>${label}</a>`
 const whatsappLink = (message) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
 
-function updateCatalogImages(categories) {
+function updateCatalogImages(categories, images = {}, photoStories = []) {
+  state.storefrontImages = images
+  state.photoStories = photoStories
+  if (images['storefront:site-background']) {
+    document.documentElement.style.setProperty('--orchard-background', `url("${images['storefront:site-background']}")`)
+  } else {
+    document.documentElement.style.removeProperty('--orchard-background')
+  }
   for (const updatedCategory of categories) {
     const category = productCategories.find((entry) => entry.slug === updatedCategory.slug)
     if (!category) continue
+    category.name = updatedCategory.name
+    category.description = updatedCategory.description
     category.image = updatedCategory.image
-    for (const updatedItem of updatedCategory.items) {
-      const item = category.items.find((entry) => entry.sku === updatedItem.sku)
-      if (item) item.image = updatedItem.image
-    }
+    category.items = updatedCategory.items.map((updatedItem) => ({
+      ...category.items.find((entry) => entry.sku === updatedItem.sku),
+      ...updatedItem,
+    }))
   }
+  farmMedia[0].image = storefrontImage('storefront:farm-fields', 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85')
+  showcaseVideos[2].poster = farmMedia[0].image
   farmMedia[1].image = productCategories[0].items[0].image
   farmMedia[2].poster = productCategories[0].items[1].image
   farmMedia[3].image = productCategories[2].image
+  farmMedia[4].image = storefrontImage('storefront:farm-packing', 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=85')
   farmMedia[5].poster = productCategories[2].image
+  showcaseVideos[3].poster = storefrontImage('storefront:farm-market-produce', 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=85')
+  farmMedia[7].poster = showcaseVideos[3].poster
   allProducts = productCategories.flatMap((category) => category.items.map((item) => ({ ...item, categorySlug: category.slug, categoryName: category.name })))
-  state.cartItems = state.cartItems.map((cartItem) => ({
-    ...cartItem,
-    image: allProducts.find((item) => item.sku === cartItem.sku)?.image ?? cartItem.image,
-  }))
+  state.cartItems = state.cartItems.map((cartItem) => {
+    const product = allProducts.find((item) => item.sku === cartItem.sku)
+    if (!product) return cartItem
+    return {
+      ...cartItem,
+      id: product.sku,
+      name: product.name,
+      categoryName: product.categoryName,
+      price: product.price,
+      priceNumber: parsePrice(product.price),
+      image: product.image,
+    }
+  })
   saveState()
 }
 
@@ -116,13 +147,13 @@ async function loadCatalogImages() {
   const response = await fetch(`${API_BASE_URL}/api/products`)
   if (!response.ok) throw new Error('Product images could not be loaded.')
   const result = await response.json()
-  if (Array.isArray(result.categories)) updateCatalogImages(result.categories)
+  if (Array.isArray(result.categories)) updateCatalogImages(result.categories, result.storefrontImages, result.photoStories)
   if (window.location.pathname !== '/admin') render()
 }
 
 function productCard(item) {
-  const reference = `${item.categorySlug}|${item.name}`
-  return `<article class="catalog-product-card" data-product-card data-name="${escapeHtml(item.name.toLowerCase())}" data-category="${item.categorySlug}" data-price="${parsePrice(item.price)}"><div class="catalog-product-image"><img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy"><span class="availability-badge">Check availability</span></div><div class="catalog-product-content"><p class="catalog-product-category">${escapeHtml(item.categoryName)}</p><h3>${escapeHtml(item.name)}</h3><p class="catalog-product-description">${escapeHtml(item.info)}</p><p class="catalog-product-price">${escapeHtml(item.price)}</p><label class="quantity-picker">Quantity<select aria-label="Quantity of ${escapeHtml(item.name)} in kilograms" data-product-quantity><option value="1">1 kg</option><option value="2">2 kg</option><option value="5">5 kg</option></select></label><button class="btn primary catalog-add-button" type="button" data-add="${escapeHtml(reference)}">Add to Cart</button></div></article>`
+  const unavailable = item.isAvailable === false
+  return `<article class="catalog-product-card" data-product-card data-name="${escapeHtml(item.name.toLowerCase())}" data-category="${item.categorySlug}" data-price="${parsePrice(item.price)}"><div class="catalog-product-image"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy"><span class="availability-badge">${unavailable ? 'Currently unavailable' : 'Check availability'}</span></div><div class="catalog-product-content"><p class="catalog-product-category">${escapeHtml(item.categoryName)}</p><h3>${escapeHtml(item.name)}</h3><p class="catalog-product-description">${escapeHtml(item.info)}</p><p class="catalog-product-price">${escapeHtml(item.price)}</p><label class="quantity-picker">Quantity<select aria-label="Quantity of ${escapeHtml(item.name)} in kilograms" data-product-quantity><option value="1">1 kg</option><option value="2">2 kg</option><option value="5">5 kg</option></select></label><button class="btn primary catalog-add-button" type="button" data-add="${escapeHtml(item.sku)}" ${unavailable ? 'disabled' : ''}>${unavailable ? 'Unavailable' : 'Add to Cart'}</button></div></article>`
 }
 
 function loadRazorpayCheckout() {
@@ -166,11 +197,11 @@ function markClicked(element, message) {
 
 function header() {
   const accountLinks = state.admin
-    ? `${link('/admin', 'Image Admin')}<span class="account-name">Hi, Admin</span><button type="button" class="header-action" data-admin-logout>Logout</button>`
+    ? `${link('/admin', 'Store Admin')}<span class="account-name">Hi, Admin</span><button type="button" class="header-action" data-admin-logout>Logout</button>`
     : state.auth
-      ? `<span class="account-name">Hi, ${escapeHtml(state.auth.user.name)}</span><button type="button" class="header-action" data-logout>Logout</button>`
-      : `${link('/login', 'Login')} ${link('/register', 'Register')}`
-  return `<header class="site-header"><div class="brand"><img src="${pahadiTokriLogo}" alt="PahadiTokri logo"></div><nav>${link('/', 'Home')} ${link('/about', 'About')} ${link('/farm', 'Farm Stories')} ${link('/products', 'Products')} ${link('/cart', `Cart (${cartItemCount()})`)} ${link('/contact-us', 'Contact Us')} ${accountLinks}</nav></header>`
+      ? `<span class="account-name">Hi, ${escapeHtml(state.auth.user.name)}</span><button type="button" class="header-action" data-logout>Logout</button> ${link('/admin', 'Store Admin')}`
+      : `${link('/login', 'Login')} ${link('/register', 'Register')} ${link('/admin', 'Store Admin')}`
+  return `<header class="site-header"><div class="brand"><img src="${storefrontImage('storefront:site-logo', pahadiTokriLogo)}" alt="PahadiTokri logo"></div><nav>${link('/', 'Home')} ${link('/about', 'About')} ${link('/farm', 'Farm Stories')} ${link('/products', 'Products')} ${link('/cart', `Cart (${cartItemCount()})`)} ${link('/contact-us', 'Contact Us')} ${accountLinks}</nav></header>`
 }
 
 function homePage() {
@@ -184,7 +215,7 @@ function homePage() {
   const himachalProduce = [
     { title: 'Shimla apples', image: productCategories[0].items[0].image, note: 'Ask us to confirm that this batch is from Shimla and currently available.' },
     { title: 'Himachali rajma', image: productCategories[2].items[0].image, note: 'Ask us to confirm the source and seasonal availability.' },
-    { title: 'Local walnuts', image: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=800&q=80', note: 'Ask us about sourcing and seasonal availability.' },
+    { title: 'Local walnuts', image: storefrontImage('storefront:home-walnuts', 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=800&q=80'), note: 'Ask us about sourcing and seasonal availability.' },
     { title: 'Traditional grains & pulses', image: productCategories[2].image, note: 'Contact us to check what is available this season.' },
     { title: 'Seasonal local produce', image: farmMedia[0].image, note: 'Ask us what is in season and where each batch comes from.' },
   ]
@@ -202,14 +233,15 @@ function homePage() {
     { title: showcaseVideos[1].title, label: 'Grains in motion', description: showcaseVideos[1].description, video: showcaseVideos[1].url, image: showcaseVideos[1].poster, alt: 'Rice harvest being transported' },
     { title: 'Naturally sweet dried fruits', label: 'Dried fruits', image: productCategories[1].image, alt: 'A mix of naturally dried fruit' },
     { title: showcaseVideos[3].title, label: 'From farm to market', description: showcaseVideos[3].description, video: showcaseVideos[3].url, image: showcaseVideos[3].poster, alt: 'Fresh produce on its way to market' },
+    ...state.photoStories.map((story) => ({ ...story, alt: story.title })),
   ]
   const photoStoryCards = photoStories.map((story, index) => {
     const visual = story.video
-      ? `<video muted loop playsinline preload="none" poster="${story.image}" aria-label="${story.alt}" data-auto-play><source src="${story.video}" type="video/mp4"></video>`
-      : `<img src="${story.image}" alt="${story.alt}" loading="lazy" decoding="async">`
+      ? `<video muted loop playsinline preload="none" poster="${escapeHtml(story.image)}" aria-label="${escapeHtml(story.alt)}" data-auto-play><source src="${escapeHtml(story.video)}" type="video/mp4"></video>`
+      : `<img src="${escapeHtml(story.image)}" alt="${escapeHtml(story.alt)}" loading="lazy" decoding="async">`
     const caption = story.video
-      ? `<span class="photo-story-caption"><small>${story.label}</small><strong>${story.title}</strong><span>${story.description}</span><button type="button" class="photo-video-toggle" data-video-toggle>Play clip</button></span><span class="photo-motion-badge"><span aria-hidden="true"></span> Moving picture</span>`
-      : `<span class="photo-story-caption"><small>${story.label}</small><strong>${story.title}</strong></span><span class="photo-motion-badge"><span aria-hidden="true"></span> Fresh picks</span>`
+      ? `<span class="photo-story-caption"><small>${escapeHtml(story.label)}</small><strong>${escapeHtml(story.title)}</strong><span>${escapeHtml(story.description)}</span><button type="button" class="photo-video-toggle" data-video-toggle>Play clip</button></span><span class="photo-motion-badge"><span aria-hidden="true"></span> Moving picture</span>`
+      : `<span class="photo-story-caption"><small>${escapeHtml(story.label)}</small><strong>${escapeHtml(story.title)}</strong>${story.description ? `<span>${escapeHtml(story.description)}</span>` : ''}</span><span class="photo-motion-badge"><span aria-hidden="true"></span> Fresh picks</span>`
     return `<article class="photo-story-card${index === 0 ? ' photo-story-featured' : ''}${story.video ? ' photo-story-video' : ''}" data-photo-story>${visual}${caption}</article>`
   }).join('')
   return `<div class="home-layout">
@@ -233,16 +265,16 @@ function farmStoriesPage() {
     const videoAction = item.type === 'video' ? '<button type="button" class="video-control-btn" data-video-toggle>Play Video</button>' : ''
     return `<article class="farm-media-card" data-media-type="${item.type}"><div class="farm-media-visual">${visual}<span class="farm-media-badge">${item.type === 'video' ? 'Video' : 'Photo'}</span></div><div class="farm-media-content"><p class="farm-media-label">${item.label}</p><h2>${item.title}</h2><p>${item.description}</p>${videoAction}</div></article>`
   }).join('')
-  return `<div class="farm-layout"><section class="farm-hero"><div><p class="eyebrow">Field notes</p><h1>Farm Stories</h1><p>Follow the journey from growing season to market through photos and videos of harvests, grains, and fresh produce.</p><div class="hero-actions">${link('/products', 'Shop the Harvest', 'btn primary')}</div></div><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=85" alt="Green fields in a mountain valley" fetchpriority="high"></section><section class="farm-gallery" aria-label="Farm photos and videos"><div class="farm-gallery-heading"><div><p class="eyebrow">From the fields</p><h2>Harvest to market</h2></div><p id="farm-result-count" aria-live="polite">${farmMedia.length} stories</p></div><div class="farm-filter-list" role="group" aria-label="Filter farm stories"><button type="button" class="farm-filter-btn" data-farm-filter="all" aria-pressed="true">All</button><button type="button" class="farm-filter-btn" data-farm-filter="photo" aria-pressed="false">Photos</button><button type="button" class="farm-filter-btn" data-farm-filter="video" aria-pressed="false">Videos</button></div><div class="farm-media-grid">${cards}</div></section></div>`
+  return `<div class="farm-layout"><section class="farm-hero"><div><p class="eyebrow">Field notes</p><h1>Farm Stories</h1><p>Follow the journey from growing season to market through photos and videos of harvests, grains, and fresh produce.</p><div class="hero-actions">${link('/products', 'Shop the Harvest', 'btn primary')}</div></div><img src="${farmMedia[0].image}" alt="Green fields in a mountain valley" fetchpriority="high"></section><section class="farm-gallery" aria-label="Farm photos and videos"><div class="farm-gallery-heading"><div><p class="eyebrow">From the fields</p><h2>Harvest to market</h2></div><p id="farm-result-count" aria-live="polite">${farmMedia.length} stories</p></div><div class="farm-filter-list" role="group" aria-label="Filter farm stories"><button type="button" class="farm-filter-btn" data-farm-filter="all" aria-pressed="true">All</button><button type="button" class="farm-filter-btn" data-farm-filter="photo" aria-pressed="false">Photos</button><button type="button" class="farm-filter-btn" data-farm-filter="video" aria-pressed="false">Videos</button></div><div class="farm-media-grid">${cards}</div></section></div>`
 }
 
 function aboutPage() {
   const highlights = [
-    ['Pure Mountain Produce', 'Naturally grown in clean Himalayan air with no unnecessary chemical exposure.', 'https://images.unsplash.com/photo-1471193945509-9ad0617afabf?auto=format&fit=crop&w=1200&q=80'],
-    ['Traditional Sun-Dried Method', 'We preserve freshness and nutrition through time-tested drying practices.', 'https://images.unsplash.com/photo-1615485925763-86786288908d?auto=format&fit=crop&w=1200&q=80'],
-    ['Sustainably Sourced', 'Every harvest supports local growers and responsible farming ecosystems.', 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=1200&q=80'],
+    ['Pure Mountain Produce', 'Naturally grown in clean Himalayan air with no unnecessary chemical exposure.', 'storefront:about-mountain-produce', 'https://images.unsplash.com/photo-1471193945509-9ad0617afabf?auto=format&fit=crop&w=1200&q=80'],
+    ['Traditional Sun-Dried Method', 'We preserve freshness and nutrition through time-tested drying practices.', 'storefront:about-sun-dried', 'https://images.unsplash.com/photo-1615485925763-86786288908d?auto=format&fit=crop&w=1200&q=80'],
+    ['Sustainably Sourced', 'Every harvest supports local growers and responsible farming ecosystems.', 'storefront:about-sustainable', 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=1200&q=80'],
   ]
-  return `<div class="about-layout"><section class="about-hero"><div><p class="eyebrow">From The Pahadi Himalayas</p><h1>About PahadiTokri</h1><p>Welcome to PahadiTokri, where we bring you the purest, freshest, and most authentic flavors of the Pahadi Himalayas - straight from our farms to your home. We specialize in fresh and dried fruits, grains, nuts, and wholesome farm produce, grown naturally in the pristine mountain air.</p><p>No middlemen, no compromises - just farm-fresh goodness, handpicked and sun-dried the traditional way. Our commitment? Pure, chemical-free, and sustainably sourced food that nourishes your body and soul.</p><p>Whether it is nutrient-rich dry fruits, organic grains, or local Himalayan specialties, we ensure every bite carries the unmatched taste and health benefits of the hills. Taste the Himalayas. Eat pure, live healthy.</p></div><img class="about-hero-image" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1400&q=80" alt="Himalayan mountain farms" loading="lazy"></section><section class="about-highlights">${highlights.map(([title, description, image]) => `<article class="about-highlight-card"><img src="${image}" alt="${title}" loading="lazy"><h3>${title}</h3><p>${description}</p></article>`).join('')}</section></div>`
+  return `<div class="about-layout"><section class="about-hero"><div><p class="eyebrow">From The Pahadi Himalayas</p><h1>About PahadiTokri</h1><p>Welcome to PahadiTokri, where we bring you the purest, freshest, and most authentic flavors of the Pahadi Himalayas - straight from our farms to your home. We specialize in fresh and dried fruits, grains, nuts, and wholesome farm produce, grown naturally in the pristine mountain air.</p><p>No middlemen, no compromises - just farm-fresh goodness, handpicked and sun-dried the traditional way. Our commitment? Pure, chemical-free, and sustainably sourced food that nourishes your body and soul.</p><p>Whether it is nutrient-rich dry fruits, organic grains, or local Himalayan specialties, we ensure every bite carries the unmatched taste and health benefits of the hills. Taste the Himalayas. Eat pure, live healthy.</p></div><img class="about-hero-image" src="${storefrontImage('storefront:about-mountains', 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1400&q=80')}" alt="Himalayan mountain farms" loading="lazy"></section><section class="about-highlights">${highlights.map(([title, description, target, fallback]) => `<article class="about-highlight-card"><img src="${storefrontImage(target, fallback)}" alt="${title}" loading="lazy"><h3>${title}</h3><p>${description}</p></article>`).join('')}</section></div>`
 }
 
 function productsPage() {
@@ -277,12 +309,14 @@ function authPage(mode) {
 
 function adminPage() {
   if (!state.admin) {
-    return `<section class="page-card section-block auth-page"><p class="eyebrow">Store management</p><h1>Admin login</h1><p>Sign in to manage product and category images.</p><form class="contact-form" id="admin-login-form"><label for="admin-email">Admin email</label><input id="admin-email" name="email" type="email" autocomplete="username" required><label for="admin-password">Password</label><input id="admin-password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form></section>`
+    return `<section class="page-card section-block auth-page"><p class="eyebrow">Store management</p><h1>Admin login</h1><p>Sign in with the store admin account to manage product details and images.</p><form class="contact-form" id="admin-login-form"><label for="admin-email">Admin email</label><input id="admin-email" name="email" type="email" autocomplete="username" required><label for="admin-password">Password</label><input id="admin-password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form></section>`
   }
 
   const targets = state.adminImages.map((entry) => `<option value="${escapeHtml(entry.target)}">${escapeHtml(entry.label)}</option>`).join('')
   const imageCards = state.adminImages.map((entry) => `<article class="admin-image-card"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.label)}" loading="lazy"><div><h3>${escapeHtml(entry.label)}</h3><p>${entry.customized ? 'Custom image' : 'Built-in image'}</p>${entry.customized ? `<button type="button" class="remove-btn" data-admin-image-delete="${escapeHtml(entry.target)}">Remove custom image</button>` : ''}</div></article>`).join('')
-  return `<div class="admin-layout"><section class="page-card section-block"><p class="eyebrow">Store management</p><h1>Manage storefront images</h1><p>Upload an image for a product or category. Removing a custom image restores the built-in image.</p><form class="contact-form" id="admin-image-form"><label for="admin-image-target">Image placement</label><select id="admin-image-target" name="target" required>${targets}</select><label for="admin-image-file">Image file (JPEG, PNG, WebP, or GIF; up to 2 MB)</label><input id="admin-image-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required><button type="submit" ${state.adminImagesLoaded ? '' : 'disabled'}>Upload image</button></form></section><section class="page-card section-block"><h2>Current images</h2>${state.adminImagesLoaded ? `<div class="admin-image-grid">${imageCards}</div>` : '<p>Loading image list…</p>'}</section></div>`
+  const productCards = state.adminProducts.map((product) => `<article class="admin-product-card"><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.categoryName)}</p><form class="contact-form admin-product-form" data-admin-product-form data-sku="${escapeHtml(product.sku)}"><label>Product name<input name="name" value="${escapeHtml(product.name)}" maxlength="100" required></label><label>Description<textarea name="info" rows="3" maxlength="500" required>${escapeHtml(product.info)}</textarea></label><label>Price per kg (₹)<input name="priceInRupees" type="number" min="0.01" max="100000" step="0.01" value="${product.priceInRupees}" required></label><label class="admin-product-availability"><input name="isAvailable" type="checkbox" ${product.isAvailable ? 'checked' : ''}><span>Available for orders</span></label><button type="submit">Save product</button></form></article>`).join('')
+  const photoStoryCards = state.adminPhotoStories.map((story) => `<article class="admin-image-card"><img src="${escapeHtml(story.image)}" alt="${escapeHtml(story.title)}" loading="lazy"><div><h3>${escapeHtml(story.title)}</h3><p>${escapeHtml(story.label)}</p><button type="button" class="remove-btn" data-admin-photo-delete="${escapeHtml(story.id)}">Remove photo story</button></div></article>`).join('')
+  return `<div class="admin-layout"><section class="page-card section-block"><p class="eyebrow">Store management</p><h1>Manage your store</h1><p>Update product details, pricing, availability, and images. Changes are saved to the backend and appear on the storefront.</p></section><section class="page-card section-block"><h2>Product details</h2>${state.adminImagesLoaded ? `<div class="admin-product-grid">${productCards}</div>` : '<p>Loading products…</p>'}</section><section class="page-card section-block"><h2>Add a photo story</h2><p>Add a new photo to the homepage gallery, or remove one of your custom stories below.</p><form class="contact-form" id="admin-photo-story-form"><label for="admin-photo-title">Photo title</label><input id="admin-photo-title" name="title" maxlength="120" required><label for="admin-photo-label">Short label</label><input id="admin-photo-label" name="label" maxlength="60" required><label for="admin-photo-description">Description (optional)</label><textarea id="admin-photo-description" name="description" rows="2" maxlength="240"></textarea><label for="admin-photo-file">Photo (JPEG, PNG, WebP, or GIF; up to 2 MB)</label><input id="admin-photo-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required><button type="submit" ${state.adminImagesLoaded ? '' : 'disabled'}>Add photo story</button></form>${state.adminImagesLoaded && photoStoryCards ? `<div class="admin-image-grid">${photoStoryCards}</div>` : ''}</section><section class="page-card section-block"><h2>Storefront images</h2><p>Replace images across the catalogue and storefront. Removing a custom image restores the built-in image.</p><form class="contact-form" id="admin-image-form"><label for="admin-image-target">Image placement</label><select id="admin-image-target" name="target" required>${targets}</select><label for="admin-image-file">Image file (JPEG, PNG, WebP, or GIF; up to 2 MB)</label><input id="admin-image-file" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required><button type="submit" ${state.adminImagesLoaded ? '' : 'disabled'}>Upload image</button></form></section><section class="page-card section-block"><h2>Current images</h2>${state.adminImagesLoaded ? `<div class="admin-image-grid">${imageCards}</div>` : '<p>Loading image list…</p>'}</section></div>`
 }
 
 function pageContent(path) {
@@ -340,12 +374,23 @@ function render() {
 
 async function loadAdminImages() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/images`, {
-      headers: { Authorization: `Bearer ${state.admin.token}` },
-    })
-    const result = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(result.error || 'Images could not be loaded.')
-    state.adminImages = result.images
+    const headers = { Authorization: `Bearer ${state.admin.token}` }
+    const [imagesResponse, productsResponse, photoStoriesResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/admin/images`, { headers }),
+      fetch(`${API_BASE_URL}/api/admin/products`, { headers }),
+      fetch(`${API_BASE_URL}/api/admin/photo-stories`, { headers }),
+    ])
+    const [imagesResult, productsResult, photoStoriesResult] = await Promise.all([
+      imagesResponse.json().catch(() => ({})),
+      productsResponse.json().catch(() => ({})),
+      photoStoriesResponse.json().catch(() => ({})),
+    ])
+    if (!imagesResponse.ok) throw new Error(imagesResult.error || 'Images could not be loaded.')
+    if (!productsResponse.ok) throw new Error(productsResult.error || 'Products could not be loaded.')
+    if (!photoStoriesResponse.ok) throw new Error(photoStoriesResult.error || 'Photo stories could not be loaded.')
+    state.adminImages = imagesResult.images
+    state.adminProducts = productsResult.products
+    state.adminPhotoStories = photoStoriesResult.stories
     state.adminImagesLoaded = true
     if (window.location.pathname === '/admin') render()
   } catch (error) {
@@ -360,14 +405,20 @@ async function loadAdminImages() {
 }
 
 function findItem(reference) {
-  const [slug, itemName] = reference.split('|')
-  const category = productCategories.find((entry) => entry.slug === slug)
-  return category ? { item: category.items.find((entry) => entry.name === itemName), category } : null
+  for (const category of productCategories) {
+    const item = category.items.find((entry) => entry.sku === reference)
+    if (item) return { item, category }
+  }
+  return null
 }
 
 function addToCart(reference, replace = false, quantity = 1) {
   const found = findItem(reference)
   if (!found?.item) return
+  if (found.item.isAvailable === false) {
+    showToast('This product is currently unavailable.', 'error')
+    return
+  }
   const selectedQuantity = Math.max(1, Math.min(99, Number(quantity) || 1))
   const newItem = itemWithCartData(found.item, found.category.name, selectedQuantity)
   if (replace) state.cartItems = [newItem]
@@ -390,6 +441,8 @@ document.addEventListener('click', (event) => {
   if (adminLogout) {
     state.admin = null
     state.adminImages = []
+    state.adminProducts = []
+    state.adminPhotoStories = []
     state.adminImagesLoaded = false
     saveState()
     navigate('/')
@@ -437,6 +490,11 @@ document.addEventListener('click', (event) => {
   const removeAdminImage = event.target.closest('[data-admin-image-delete]')
   if (removeAdminImage) {
     void removeManagedImage(removeAdminImage.dataset.adminImageDelete)
+    return
+  }
+  const removeAdminPhoto = event.target.closest('[data-admin-photo-delete]')
+  if (removeAdminPhoto) {
+    void removeManagedPhotoStory(removeAdminPhoto.dataset.adminPhotoDelete)
     return
   }
   const toggle = event.target.closest('[data-video-toggle]')
@@ -503,12 +561,90 @@ document.addEventListener('submit', async (event) => {
       if (!response.ok) throw new Error(result.error || 'Admin login failed.')
       state.admin = result
       state.adminImages = []
+      state.adminProducts = []
+      state.adminPhotoStories = []
       state.adminImagesLoaded = false
       saveState()
       render()
       showToast('Welcome, admin')
     } catch (error) {
       showToast(error.message || 'Admin login failed.', 'error')
+    }
+    return
+  }
+  if (event.target.id === 'admin-photo-story-form') {
+    event.preventDefault()
+    const form = event.target
+    const formData = new FormData(form)
+    const file = formData.get('image')
+    if (!(file instanceof File) || !file.size) {
+      showToast('Select an image to upload.', 'error')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Images must be 2 MB or smaller.', 'error')
+      return
+    }
+    const submitButton = form.querySelector('button[type="submit"]')
+    submitButton.disabled = true
+    try {
+      const storyDetails = new URLSearchParams({
+        title: formData.get('title'),
+        label: formData.get('label'),
+        description: formData.get('description'),
+      })
+      const response = await fetch(`${API_BASE_URL}/api/admin/photo-stories?${storyDetails}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${state.admin.token}`,
+          'Content-Type': file.type,
+        },
+        body: file,
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Photo story could not be added.')
+      form.reset()
+      state.adminImagesLoaded = false
+      await loadCatalogImages()
+      await loadAdminImages()
+      showToast('Photo story added')
+    } catch (error) {
+      showToast(error.message || 'Photo story could not be added.', 'error')
+    } finally {
+      submitButton.disabled = false
+    }
+    return
+  }
+  if (event.target.matches('[data-admin-product-form]')) {
+    event.preventDefault()
+    const form = event.target
+    const formData = new FormData(form)
+    const submitButton = form.querySelector('button[type="submit"]')
+    submitButton.disabled = true
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${encodeURIComponent(form.dataset.sku)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${state.admin.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.get('name'),
+          info: formData.get('info'),
+          priceInRupees: Number(formData.get('priceInRupees')),
+          isAvailable: formData.has('isAvailable'),
+        }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Product could not be updated.')
+      await loadCatalogImages()
+      state.adminImagesLoaded = false
+      await loadAdminImages()
+      showToast('Product updated')
+    } catch (error) {
+      showToast(error.message || 'Product could not be updated.', 'error')
+    } finally {
+      submitButton.disabled = false
     }
     return
   }
@@ -660,6 +796,23 @@ async function removeManagedImage(target) {
     showToast('Custom image removed')
   } catch (error) {
     showToast(error.message || 'Image could not be removed.', 'error')
+  }
+}
+
+async function removeManagedPhotoStory(id) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/photo-stories/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${state.admin.token}` },
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(result.error || 'Photo story could not be removed.')
+    state.adminImagesLoaded = false
+    await loadCatalogImages()
+    await loadAdminImages()
+    showToast('Photo story removed')
+  } catch (error) {
+    showToast(error.message || 'Photo story could not be removed.', 'error')
   }
 }
 

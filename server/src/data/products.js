@@ -191,18 +191,26 @@ for (const category of productCategories) {
   }
 }
 
-export function findProductBySku(sku) {
-  return skuIndex.get(sku) ?? null
+export function findProductBySku(sku, categories = productCategories) {
+  if (categories === productCategories) return skuIndex.get(sku) ?? null
+  for (const category of categories) {
+    const product = category.items.find((item) => item.sku === sku)
+    if (product) return { ...product, categorySlug: category.slug, categoryName: category.name }
+  }
+  return null
 }
 
-export function calculateCartTotals(lineItems) {
+export function calculateCartTotals(lineItems, categories = productCategories) {
   const resolved = []
   let subtotal = 0
 
   for (const line of lineItems) {
-    const product = findProductBySku(line.sku)
+    const product = findProductBySku(line.sku, categories)
     if (!product) {
       throw new Error(`Unknown product: ${line.sku}`)
+    }
+    if (product.isAvailable === false) {
+      throw new Error(`${product.name} is currently unavailable.`)
     }
     const quantity = Math.max(1, Math.min(99, Number(line.quantity) || 1))
     const lineTotal = product.priceInRupees * quantity

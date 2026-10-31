@@ -2,7 +2,7 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import { promisify } from 'node:util'
 import { createUser, findUserByEmail } from '../store/users.js'
-import { createToken } from '../services/tokens.js'
+import { createToken, isTokenSecretConfigured } from '../services/tokens.js'
 
 const router = Router()
 const scrypt = promisify(crypto.scrypt)
@@ -25,6 +25,9 @@ async function verifyPassword(password, storedHash) {
 }
 
 router.post('/register', async (req, res) => {
+  if (!isTokenSecretConfigured()) {
+    return res.status(503).json({ error: 'Account authentication is not configured.' })
+  }
   const { name, email, password } = req.body ?? {}
   if (!name?.trim() || !email?.trim() || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required.' })
@@ -43,6 +46,9 @@ router.post('/register', async (req, res) => {
 })
 
 router.post('/login', async (req, res) => {
+  if (!isTokenSecretConfigured()) {
+    return res.status(503).json({ error: 'Account authentication is not configured.' })
+  }
   const { email, password } = req.body ?? {}
   const user = email ? await findUserByEmail(email) : null
   if (!user || !password || !(await verifyPassword(password, user.passwordHash))) {

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { calculateCartTotals } from '../data/products.js'
+import { getProductCatalog } from '../store/catalog.js'
 import { createRazorpayOrder, getRazorpayKeyId, isOnlinePaymentsConfigured } from '../services/razorpay.js'
 import { getOrderById, listOrdersByPhone, saveOrder } from '../store/orders.js'
 
@@ -20,7 +21,7 @@ router.post('/', async (req, res) => {
 
   let totals
   try {
-    totals = calculateCartTotals(items)
+    totals = calculateCartTotals(items, await getProductCatalog())
   } catch (error) {
     return res.status(400).json({ error: error.message })
   }

@@ -1,9 +1,10 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { getStore } from '@netlify/blobs'
 
-const dataDir = process.env.DATA_DIR || path.join('/tmp', 'pahaditokri-data')
+const dataDir = process.env.DATA_DIR || path.join(tmpdir(), 'pahaditokri-data')
 const usersFile = path.join(dataDir, 'users.json')
 const useNetlifyBlobs = process.env.NETLIFY === 'true'
 
